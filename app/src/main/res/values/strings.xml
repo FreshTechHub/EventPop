@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">EventPop</string>
+    <string name="home_greeting">Hi Kalanzi!</string>
+    <string name="hot_events_title">Hot events in your area</string>
+    <string name="see_all">See All</string>
+    <string name="rsvp">RSVP</string>
+    <string name="rsvp_count">RSVP: %d</string>
+    <string name="nav_discover">Discover</string>
+    <string name="nav_events">Events</string>
+    <string name="nav_profile">Profile</string>
+    <string name="nav_settings">Settings</string>
+</resources>
