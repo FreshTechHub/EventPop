@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,7 +53,12 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.android.example.eventpop.R
 import com.android.example.eventpop.data.Event
+import com.android.example.eventpop.data.EventCategory
+import com.android.example.eventpop.data.EventFilter
+import com.android.example.eventpop.data.EventLocation
+import com.android.example.eventpop.data.EventType
 import com.android.example.eventpop.data.SampleEvents
+import com.android.example.eventpop.data.TimeRange
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.CardBackground
 import com.android.example.eventpop.ui.theme.EventPopTheme
@@ -76,10 +82,34 @@ private val CardElevation = 2.dp
 private val CardShape = RoundedCornerShape(12.dp)
 private val HotSectionShape = RoundedCornerShape(12.dp)
 
+private fun EventFilter.applyTo(events: List<Event>): List<Event> {
+    return events.filter { event ->
+        val typeMatch = selectedTypes.isEmpty() || selectedTypes.any { type ->
+            when (type) {
+                EventType.MUSIC -> event.category == EventCategory.MUSIC
+                EventType.FOOD -> event.category == EventCategory.FOOD
+                EventType.COMEDY -> event.category == EventCategory.COMEDY
+                EventType.ART -> event.category == EventCategory.ART
+                EventType.SOOTHE -> event.category == EventCategory.WELLNESS
+            }
+        }
+        val locationMatch = selectedLocation == EventLocation.ALL_AREAS ||
+            event.location.equals(selectedLocation.label, ignoreCase = true)
+        val timeMatch = when (selectedTime) {
+            TimeRange.ANYTIME -> true
+            TimeRange.TODAY -> event.timeInfo.contains("Today", ignoreCase = true)
+            TimeRange.THIS_WEEKEND -> event.timeInfo.contains("Weekend", ignoreCase = true)
+        }
+        typeMatch && locationMatch && timeMatch
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     events: List<Event> = SampleEvents.list,
+    onFilterClick: (() -> Unit)? = null,
+    currentFilter: EventFilter? = null,
     onSeeAllHotEvents: () -> Unit = {},
     onEventRsvp: (Event) -> Unit = {},
     onMenuClick: () -> Unit = {},
@@ -93,6 +123,7 @@ fun HomeScreen(
     selectedProfile: Boolean = false,
     selectedSettings: Boolean = false
 ) {
+    val displayedEvents = if (currentFilter != null) currentFilter.applyTo(events) else events
     Scaffold(
         topBar = {
             TopAppBar(
@@ -220,12 +251,30 @@ fun HomeScreen(
             item {
                 MapSection()
             }
+            if (onFilterClick != null) {
+                item {
+                    OutlinedButton(
+                        onClick = onFilterClick,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeAccent),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, OrangeAccent),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.filter_events_title),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
             item {
                 HotEventsSection(
                     onSeeAll = onSeeAllHotEvents
                 )
             }
-            items(events) { event ->
+            items(displayedEvents) { event ->
                 EventCard(
                     event = event,
                     onRsvp = { onEventRsvp(event) }

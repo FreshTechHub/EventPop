@@ -10,20 +10,77 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddLocation
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Fastfood
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarRate
+import androidx.compose.material.icons.filled.TheaterComedy
+import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgeDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +88,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -41,6 +99,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.example.eventpop.ui.theme.EventPopTheme
+import kotlinx.coroutines.launch
 
 // Color constants
 private val LandingBackground = Color(0xFF0D1117)
@@ -53,7 +112,7 @@ private val TextLightGray = Color(0xFFCCCCCC)
 
 // Data models
 data class Feature(
-    val icon: String,
+    val icon: ImageVector,
     val title: String,
     val description: String
 )
@@ -79,6 +138,7 @@ class LandingPageActivity : ComponentActivity() {
     }
 }
 
+// Helper to safely find the Activity from a Context
 fun Context.findActivity(): Activity? {
     var context = this
     while (context is ContextWrapper) {
@@ -93,6 +153,7 @@ fun Context.findActivity(): Activity? {
 private fun LandingPage(onGetStarted: () -> Unit) {
     val context = LocalContext.current
     val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
     BackHandler {
         context.findActivity()?.finish()
@@ -114,7 +175,12 @@ private fun LandingPage(onGetStarted: () -> Unit) {
                 HeroSection(
                     listState = listState,
                     index = 0,
-                    onGetStarted = onGetStarted
+                    onGetStarted = onGetStarted,
+                    onLearnMore = {
+                        coroutineScope.launch {
+                            listState.animateScrollToItem(index = 2)
+                        }
+                    }
                 )
             }
             item(key = "stats") {
@@ -155,7 +221,8 @@ private fun sectionVisible(listState: LazyListState, index: Int): Boolean {
 private fun HeroSection(
     listState: LazyListState,
     index: Int,
-    onGetStarted: () -> Unit
+    onGetStarted: () -> Unit,
+    onLearnMore: () -> Unit
 ) {
     var visible by remember { mutableStateOf(false) }
     val show = sectionVisible(listState, index)
@@ -175,7 +242,7 @@ private fun HeroSection(
                 .fillMaxHeight(0.9f)
                 .padding(horizontal = 20.dp, vertical = 24.dp)
         ) {
-            FloatingIconsBackground()
+            HeroRadarBackground()
 
             Column(
                 modifier = Modifier
@@ -187,6 +254,23 @@ private fun HeroSection(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.LocationOn,
+                            contentDescription = "Logo",
+                            tint = GradientOrange,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Text(
+                            text = "PopUp Kampala",
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 16.sp
+                        )
+                    }
                     val headline = buildAnnotatedString {
                         append("Discover What's Happening ")
                         withStyle(
@@ -222,9 +306,7 @@ private fun HeroSection(
                     )
                     OutlinedLandingButton(
                         text = "Learn More",
-                        onClick = {
-                            // Scroll to features roughly
-                        }
+                        onClick = onLearnMore
                     )
                 }
             }
@@ -233,59 +315,46 @@ private fun HeroSection(
 }
 
 @Composable
-private fun FloatingIconsBackground() {
-    val icons = listOf("📍", "🎵", "🍔", "🎨", "🎭")
-    val infiniteTransition = rememberInfiniteTransition(label = "floating")
+private fun HeroRadarBackground() {
+    val infiniteTransition = rememberInfiniteTransition(label = "radar")
+    val radius by infiniteTransition.animateFloat(
+        initialValue = 40f,
+        targetValue = 200f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 4000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "radarRadius"
+    )
 
-    icons.forEachIndexed { index, icon ->
-        val amplitude = 10 + index * 4
-        val duration = 4000 + index * 600
-        val phase = index * 40
+    val alpha = 1f - (radius - 40f) / (200f - 40f)
 
-        val offsetY by infiniteTransition.animateFloat(
-            initialValue = -amplitude.toFloat(),
-            targetValue = amplitude.toFloat(),
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = duration, easing = LinearEasing, delayMillis = phase),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "offsetY$index"
-        )
-
-        val offsetX by infiniteTransition.animateFloat(
-            initialValue = -6f,
-            targetValue = 6f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = duration * 2, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "offsetX$index"
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-        ) {
-            Text(
-                text = icon,
-                fontSize = 24.sp,
-                modifier = Modifier
-                    .align(
-                        when (index) {
-                            0 -> Alignment.TopStart
-                            1 -> Alignment.TopEnd
-                            2 -> Alignment.CenterStart
-                            3 -> Alignment.CenterEnd
-                            else -> Alignment.BottomCenter
-                        }
-                    )
-                    .offset(
-                        x = offsetX.dp,
-                        y = offsetY.dp
-                    ),
-                color = TextLightGray.copy(alpha = 0.4f)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = Offset(size.width / 2f, size.height / 2f)
+            drawCircle(
+                color = GradientOrange.copy(alpha = 0.08f * alpha.coerceIn(0f, 1f)),
+                radius = radius.dp.toPx(),
+                center = center
+            )
+            drawCircle(
+                color = GradientOrange.copy(alpha = 0.05f),
+                radius = 260.dp.toPx(),
+                center = center
             )
         }
+
+        Icon(
+            imageVector = Icons.Filled.LocationOn,
+            contentDescription = null,
+            tint = GradientOrange.copy(alpha = 0.06f),
+            modifier = Modifier
+                .size(280.dp)
+                .align(Alignment.Center)
+        )
     }
 }
 
@@ -363,12 +432,12 @@ private fun FeaturesSection(listState: LazyListState, index: Int) {
     }
 
     val features = listOf(
-        Feature("🗺️", "Live Map", "See events pinned across Kampala in real time."),
-        Feature("🔔", "Instant Alerts", "Get notified when new pop-ups go live."),
-        Feature("🎟️", "Quick RSVP", "Join events with a single tap."),
-        Feature("🎨", "Event Types", "Filter by music, food, art & more."),
-        Feature("⭐", "Vibe Checks", "See ratings before you commit."),
-        Feature("📍", "Add Pop-Ups", "Host your own micro-events easily.")
+        Feature(Icons.Filled.Map, "Live Map", "See events pinned across Kampala in real time."),
+        Feature(Icons.Filled.NotificationsActive, "Instant Alerts", "Get notified when new pop-ups go live."),
+        Feature(Icons.Filled.ConfirmationNumber, "Quick RSVP", "Join events with a single tap."),
+        Feature(Icons.Filled.Category, "Event Types", "Filter by music, food, art & more."),
+        Feature(Icons.Filled.StarRate, "Vibe Checks", "See ratings before you commit."),
+        Feature(Icons.Filled.AddLocation, "Add Pop-Ups", "Host your own micro-events easily.")
     )
 
     AnimatedVisibility(
@@ -390,17 +459,24 @@ private fun FeaturesSection(listState: LazyListState, index: Int) {
                 fontSize = 20.sp,
                 textAlign = TextAlign.Center
             )
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 260.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                userScrollEnabled = false
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                gridItems(features) { feature ->
-                    FeatureCard(feature)
+                features.chunked(2).forEach { rowItems ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        rowItems.forEach { feature ->
+                            Box(modifier = Modifier.weight(1f)) {
+                                FeatureCard(feature)
+                            }
+                        }
+                        if (rowItems.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
                 }
             }
         }
@@ -431,7 +507,12 @@ private fun FeatureCard(feature: Feature) {
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = feature.icon, fontSize = 18.sp)
+                Icon(
+                    imageVector = feature.icon,
+                    contentDescription = feature.title,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
             }
             Text(
                 text = feature.title,
@@ -525,7 +606,7 @@ private fun StepItem(
                 Text(
                     text = index.toString(),
                     color = Color.White,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.ExtraBold,
                     fontSize = 14.sp
                 )
             }
@@ -590,12 +671,23 @@ private fun EventPreviewSection(listState: LazyListState, index: Int) {
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Hot Events Right Now 🔥",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp
-            )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Hot Events Right Now",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp
+                    )
+                    Icon(
+                        imageVector = Icons.Filled.Whatshot,
+                        contentDescription = "Hot events",
+                        tint = GradientOrange,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
 
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -633,7 +725,16 @@ private fun EventCard(event: EventPreview) {
                             end = Offset.Infinite
                         )
                     )
-            )
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Event,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.3f),
+                    modifier = Modifier
+                        .size(48.dp)
+                        .align(Alignment.Center)
+                )
+            }
             Text(
                 text = event.title,
                 color = Color.White,
@@ -762,7 +863,12 @@ private fun FooterSection(listState: LazyListState, index: Int) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    Text(text = "📍", fontSize = 18.sp)
+                    Icon(
+                        imageVector = Icons.Filled.LocationOn,
+                        contentDescription = "Logo",
+                        tint = GradientOrange,
+                        modifier = Modifier.size(28.dp)
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "PopUp Kampala",
@@ -780,9 +886,18 @@ private fun FooterSection(listState: LazyListState, index: Int) {
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SocialCircle("IG")
-                    SocialCircle("X")
-                    SocialCircle("WA")
+                    SocialCircle(
+                        icon = Icons.Filled.CameraAlt,
+                        contentDescription = "Instagram"
+                    )
+                    SocialCircle(
+                        icon = Icons.Filled.Share,
+                        contentDescription = "Share"
+                    )
+                    SocialCircle(
+                        icon = Icons.Filled.Phone,
+                        contentDescription = "WhatsApp"
+                    )
                 }
             }
         }
@@ -790,10 +905,10 @@ private fun FooterSection(listState: LazyListState, index: Int) {
 }
 
 @Composable
-private fun SocialCircle(label: String) {
+private fun SocialCircle(icon: ImageVector, contentDescription: String) {
     Box(
         modifier = Modifier
-            .size(32.dp)
+            .size(48.dp)
             .clip(CircleShape)
             .background(
                 Brush.linearGradient(
@@ -802,11 +917,11 @@ private fun SocialCircle(label: String) {
             ),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = label,
-            color = Color.White,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = Color.White,
+            modifier = Modifier.size(24.dp)
         )
     }
 }
