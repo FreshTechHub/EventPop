@@ -12,4 +12,25 @@
     <string name="filter_events_title">Filter Events</string>
     <string name="filter_reset">Reset</string>
     <string name="filter_apply">Apply</string>
+
+    <!-- Event detail -->
+    <string name="back">Back</string>
+    <string name="share">Share</string>
+    <string name="content_desc_favorite">Favorite</string>
+    <string name="free_entry">FREE ENTRY</string>
+    <string name="people_going">%1$d people going</string>
+    <string name="area_kampala">%1$s, Kampala</string>
+    <string name="time_range">%1$s - %2$s</string>
+    <string name="vibe_check">Vibe Check</string>
+    <string name="rating_out_of_five">%1$.1f / 5.0</string>
+    <string name="about_this_event">About This Event</string>
+    <string name="organized_by">Organized by</string>
+    <string name="contact_organizer">Contact Organizer</string>
+    <string name="location_title">Location</string>
+    <string name="map_coming_soon">Map coming soon</string>
+    <string name="rsvp_now">RSVP Now</string>
+    <string name="rsvpd">RSVP\'d!</string>
+    <string name="rsvp_success_snackbar">You\'re in! See you there 🎉</string>
+    <string name="price_ugx">UGX %1$s</string>
+    <string name="free">Free</string>
 </resources>

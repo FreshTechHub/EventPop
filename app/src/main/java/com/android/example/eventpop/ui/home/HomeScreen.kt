@@ -112,6 +112,7 @@ fun HomeScreen(
     currentFilter: EventFilter? = null,
     onSeeAllHotEvents: () -> Unit = {},
     onEventRsvp: (Event) -> Unit = {},
+    onEventClick: (Event) -> Unit = {},
     onMenuClick: () -> Unit = {},
     onSearchClick: () -> Unit = {},
     onNavDiscover: () -> Unit = {},
@@ -277,7 +278,8 @@ fun HomeScreen(
             items(displayedEvents) { event ->
                 EventCard(
                     event = event,
-                    onRsvp = { onEventRsvp(event) }
+                    onRsvp = { onEventRsvp(event) },
+                    onClick = { onEventClick(event) }
                 )
             }
         }
@@ -391,12 +393,14 @@ private fun HotEventsSection(onSeeAll: () -> Unit) {
 @Composable
 private fun EventCard(
     event: Event,
-    onRsvp: () -> Unit
+    onRsvp: () -> Unit,
+    onClick: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp)
+            .clickable(onClick = onClick),
         shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = CardBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = CardElevation)
