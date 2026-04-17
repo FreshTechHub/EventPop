@@ -3,10 +3,11 @@ package com.android.example.eventpop.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.tween
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,12 +22,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.SelectableChipColors
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -87,7 +90,7 @@ fun FilterEventsScreen(
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
-                            imageVector = Icons.Filled.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
                             tint = SectionHeaderColor
                         )
@@ -114,7 +117,7 @@ fun FilterEventsScreen(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, SectionHeaderColor),
-                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                    colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = SectionHeaderColor
                     )
                 ) {
@@ -130,8 +133,10 @@ fun FilterEventsScreen(
                     },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = FilterApplyOrange),
-                    contentColor = SectionHeaderColor
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = FilterApplyOrange,
+                        contentColor = SectionHeaderColor
+                    )
                 ) {
                     Text(text = stringResource(R.string.filter_apply), fontWeight = FontWeight.Bold)
                 }
@@ -204,7 +209,7 @@ fun FilterEventsScreen(
                                     )
                                 }
                             } else null,
-                            colors = filterChipColors(selected),
+                            colors = filterChipColors(),
                             shape = RoundedCornerShape(50)
                         )
                     }
@@ -242,7 +247,7 @@ fun FilterEventsScreen(
                                     )
                                 }
                             } else null,
-                            colors = filterChipColors(selected),
+                            colors = filterChipColors(),
                             shape = RoundedCornerShape(50)
                         )
                     }
@@ -262,6 +267,7 @@ private fun FilterSectionLabel(text: String) {
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FlowRowChips(
     eventTypes: List<EventType>,
@@ -287,7 +293,7 @@ private fun FlowRowChips(
                         tint = SectionHeaderColor
                     )
                 },
-                colors = filterChipColors(selected),
+                colors = filterChipColors(),
                 shape = RoundedCornerShape(50)
             )
         }
@@ -295,12 +301,11 @@ private fun FlowRowChips(
 }
 
 @Composable
-private fun filterChipColors(selected: Boolean): androidx.compose.material3.FilterChipColors =
+private fun filterChipColors(): SelectableChipColors =
     FilterChipDefaults.filterChipColors(
         containerColor = Color.Transparent,
         labelColor = SectionHeaderColor,
-        leadingIconColor = SectionHeaderColor,
-        borderColor = SectionHeaderColor,
+        iconColor = SectionHeaderColor,
         selectedContainerColor = FilterChipSelected,
         selectedLabelColor = SectionHeaderColor,
         selectedLeadingIconColor = SectionHeaderColor

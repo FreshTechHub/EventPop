@@ -30,7 +30,7 @@
     <string name="map_coming_soon">Map coming soon</string>
     <string name="rsvp_now">RSVP Now</string>
     <string name="rsvpd">RSVP\'d!</string>
-    <string name="rsvp_success_snackbar">You\'re in! See you there 🎉</string>
+    <string name="rsvp_success_message">You\'re in! See you there 🎉</string>
     <string name="price_ugx">UGX %1$s</string>
     <string name="free">Free</string>
 </resources>

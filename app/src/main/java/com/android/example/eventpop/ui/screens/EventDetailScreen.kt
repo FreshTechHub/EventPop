@@ -1,6 +1,7 @@
 package com.android.example.eventpop.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -21,7 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Event
@@ -39,6 +40,7 @@ import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,13 +55,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphicsLayer
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -93,6 +96,7 @@ private val HeroScrim = Brush.verticalGradient(
     colors = listOf(Color.Transparent, DetailBackground)
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EventDetailScreen(
     navController: NavController,
@@ -105,6 +109,13 @@ fun EventDetailScreen(
     val rsvpSuccess by viewModel.rsvpSuccess.collectAsState()
     val rsvpLoading by viewModel.rsvpLoading.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+
+    val heartColor by animateColorAsState(
+        targetValue = if (isInterested) HeartRed else Color.White,
+        animationSpec = tween(200),
+        label = "heart"
+    )
 
     LaunchedEffect(eventId) {
         viewModel.loadEvent(eventId ?: "")
@@ -113,7 +124,7 @@ fun EventDetailScreen(
     LaunchedEffect(rsvpSuccess) {
         if (rsvpSuccess) {
             snackbarHostState.showSnackbar(
-                message = stringResource(R.string.rsvp_success_snackbar),
+                message = context.getString(R.string.rsvp_success_message),
                 withDismissAction = true
             )
         }
@@ -128,7 +139,7 @@ fun EventDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
-                            imageVector = Icons.Filled.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.back),
                             tint = Color.White
                         )
@@ -136,11 +147,6 @@ fun EventDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = { viewModel.toggleInterested() }) {
-                        val heartColor by androidx.compose.animation.core.animateColorAsState(
-                            targetValue = if (isInterested) HeartRed else Color.White,
-                            animationSpec = tween(200),
-                            label = "heart"
-                        )
                         Icon(
                             imageVector = if (isInterested) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                             contentDescription = stringResource(R.string.content_desc_favorite),
@@ -189,15 +195,15 @@ fun EventDetailScreen(
                         .padding(horizontal = 16.dp)
                         .padding(bottom = 16.dp)
                 ) {
-                    TitleAndMetaBlock(ev, blockIndex = 0)
+                    TitleAndMetaBlock(ev)
                     HorizontalDivider(color = Color(0xFF1B2A4A), modifier = Modifier.padding(vertical = 12.dp))
-                    VibeCheckBlock(ev, blockIndex = 1)
+                    VibeCheckBlock(ev)
                     HorizontalDivider(color = Color(0xFF1B2A4A), modifier = Modifier.padding(vertical = 12.dp))
-                    AboutBlock(ev, blockIndex = 2)
+                    AboutBlock(ev)
                     HorizontalDivider(color = Color(0xFF1B2A4A), modifier = Modifier.padding(vertical = 12.dp))
-                    OrganizerBlock(ev, blockIndex = 3)
+                    OrganizerBlock(ev)
                     HorizontalDivider(color = Color(0xFF1B2A4A), modifier = Modifier.padding(vertical = 12.dp))
-                    MapBlock(blockIndex = 4)
+                    MapBlock()
                 }
             }
         } ?: run {
@@ -218,7 +224,7 @@ fun EventDetailScreen(
 
 @Composable
 private fun HeroSection(event: Event) {
-    var scaleTarget by remember { mutableStateOf(0.97f) }
+    var scaleTarget by remember { mutableFloatStateOf(0.97f) }
     LaunchedEffect(event) {
         scaleTarget = 1f
     }
@@ -288,10 +294,10 @@ private fun HeroSection(event: Event) {
 }
 
 @Composable
-private fun TitleAndMetaBlock(event: Event, blockIndex: Int) {
+private fun TitleAndMetaBlock(event: Event) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(event) {
-        delay(80L * blockIndex)
+        delay(0L)
         visible = true
     }
     AnimatedVisibility(
@@ -357,10 +363,10 @@ private fun TitleAndMetaBlock(event: Event, blockIndex: Int) {
 }
 
 @Composable
-private fun VibeCheckBlock(event: Event, blockIndex: Int) {
+private fun VibeCheckBlock(event: Event) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(event) {
-        delay(80L * blockIndex)
+        delay(80L)
         visible = true
     }
     AnimatedVisibility(
@@ -399,10 +405,10 @@ private fun VibeCheckBlock(event: Event, blockIndex: Int) {
 }
 
 @Composable
-private fun AboutBlock(event: Event, blockIndex: Int) {
+private fun AboutBlock(event: Event) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(event) {
-        delay(80L * blockIndex)
+        delay(160L)
         visible = true
     }
     AnimatedVisibility(
@@ -427,10 +433,10 @@ private fun AboutBlock(event: Event, blockIndex: Int) {
 }
 
 @Composable
-private fun OrganizerBlock(event: Event, blockIndex: Int) {
+private fun OrganizerBlock(event: Event) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(event) {
-        delay(80L * blockIndex)
+        delay(240L)
         visible = true
     }
     AnimatedVisibility(
@@ -466,10 +472,10 @@ private fun OrganizerBlock(event: Event, blockIndex: Int) {
 }
 
 @Composable
-private fun MapBlock(blockIndex: Int) {
+private fun MapBlock() {
     var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(blockIndex) {
-        delay(80L * blockIndex)
+    LaunchedEffect(Unit) {
+        delay(320L)
         visible = true
     }
     AnimatedVisibility(
@@ -525,7 +531,7 @@ private fun EventDetailBottomBar(
     rsvpLoading: Boolean,
     onRsvpClick: () -> Unit
 ) {
-    val rsvpButtonColor by androidx.compose.animation.core.animateColorAsState(
+    val rsvpButtonColor by animateColorAsState(
         targetValue = if (rsvpSuccess) RsvpSuccessGreen else Color.Transparent,
         animationSpec = tween(300),
         label = "rsvpButton"
