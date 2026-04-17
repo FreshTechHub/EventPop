@@ -28,9 +28,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -66,6 +63,7 @@ import com.android.example.eventpop.ui.theme.HotSectionNavy
 import com.android.example.eventpop.ui.theme.OrangeAccent
 import com.android.example.eventpop.ui.theme.StarFilled
 import com.android.example.eventpop.ui.theme.StarUnfilled
+import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.SubtitleGray
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
@@ -148,8 +146,8 @@ fun HomeScreen(
                 actions = {
                     IconButton(onClick = onSearchClick) {
                         Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = stringResource(R.string.search_title),
                             tint = Color.White
                         )
                     }
@@ -163,84 +161,16 @@ fun HomeScreen(
             )
         },
         bottomBar = {
-            NavigationBar(
-                containerColor = AppBarNavy,
-                contentColor = Color.White,
-                tonalElevation = 0.dp
-            ) {
-                NavigationBarItem(
-                    selected = selectedDiscover,
-                    onClick = onNavDiscover,
-                    icon = {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_nav_discover),
-                            contentDescription = stringResource(R.string.nav_discover)
-                        )
-                    },
-                    label = { Text(stringResource(R.string.nav_discover)) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = OrangeAccent,
-                        selectedTextColor = OrangeAccent,
-                        unselectedIconColor = Color.White.copy(alpha = 0.8f),
-                        unselectedTextColor = Color.White.copy(alpha = 0.8f),
-                        indicatorColor = if (selectedDiscover) OrangeAccent else Color.Transparent
-                    )
-                )
-                NavigationBarItem(
-                    selected = selectedEvents,
-                    onClick = onNavEvents,
-                    icon = {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_nav_events),
-                            contentDescription = stringResource(R.string.nav_events)
-                        )
-                    },
-                    label = { Text(stringResource(R.string.nav_events)) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = OrangeAccent,
-                        selectedTextColor = OrangeAccent,
-                        unselectedIconColor = Color.White.copy(alpha = 0.8f),
-                        unselectedTextColor = Color.White.copy(alpha = 0.8f),
-                        indicatorColor = if (selectedEvents) OrangeAccent else Color.Transparent
-                    )
-                )
-                NavigationBarItem(
-                    selected = selectedProfile,
-                    onClick = onNavProfile,
-                    icon = {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_nav_profile),
-                            contentDescription = stringResource(R.string.nav_profile)
-                        )
-                    },
-                    label = { Text(stringResource(R.string.nav_profile)) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = OrangeAccent,
-                        selectedTextColor = OrangeAccent,
-                        unselectedIconColor = Color.White.copy(alpha = 0.8f),
-                        unselectedTextColor = Color.White.copy(alpha = 0.8f),
-                        indicatorColor = if (selectedProfile) OrangeAccent else Color.Transparent
-                    )
-                )
-                NavigationBarItem(
-                    selected = selectedSettings,
-                    onClick = onNavSettings,
-                    icon = {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_nav_settings),
-                            contentDescription = stringResource(R.string.nav_settings)
-                        )
-                    },
-                    label = { Text(stringResource(R.string.nav_settings)) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = OrangeAccent,
-                        selectedTextColor = OrangeAccent,
-                        unselectedIconColor = Color.White.copy(alpha = 0.8f),
-                        unselectedTextColor = Color.White.copy(alpha = 0.8f),
-                        indicatorColor = if (selectedSettings) OrangeAccent else Color.Transparent
-                    )
-                )
-            }
+            EventPopBottomBar(
+                selectedDiscover = selectedDiscover,
+                selectedEvents = selectedEvents,
+                selectedProfile = selectedProfile,
+                selectedSettings = selectedSettings,
+                onNavDiscover = onNavDiscover,
+                onNavEvents = onNavEvents,
+                onNavProfile = onNavProfile,
+                onNavSettings = onNavSettings
+            )
         }
     ) { innerPadding ->
         LazyColumn(

@@ -14,6 +14,9 @@ import com.android.example.eventpop.data.EventFilter
 import com.android.example.eventpop.ui.home.HomeScreen
 import com.android.example.eventpop.ui.screens.EventDetailScreen
 import com.android.example.eventpop.ui.screens.FilterEventsScreen
+import com.android.example.eventpop.ui.screens.ProfileScreen
+import com.android.example.eventpop.ui.screens.SearchScreen
+import com.android.example.eventpop.ui.screens.SettingsScreen
 import com.android.example.eventpop.ui.viewmodel.EventDetailViewModel
 
 object EventPopDestinations {
@@ -21,6 +24,7 @@ object EventPopDestinations {
     const val EVENTS = "events"
     const val PROFILE = "profile"
     const val SETTINGS = "settings"
+    const val SEARCH = "search"
     const val FILTER_EVENTS = "filter_events"
     const val FILTER_RESULT_KEY = "event_filter"
     const val EVENT_DETAIL = "event_detail/{eventId}"
@@ -53,6 +57,7 @@ fun EventPopNavGraph(
                 onNavEvents = { },
                 onNavProfile = { navController.navigate(EventPopDestinations.PROFILE) },
                 onNavSettings = { navController.navigate(EventPopDestinations.SETTINGS) },
+                onSearchClick = { navController.navigate(EventPopDestinations.SEARCH) },
                 onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) }
             )
         }
@@ -77,34 +82,18 @@ fun EventPopNavGraph(
                 onNavEvents = { navController.navigate(EventPopDestinations.EVENTS) },
                 onNavProfile = { navController.navigate(EventPopDestinations.PROFILE) },
                 onNavSettings = { navController.navigate(EventPopDestinations.SETTINGS) },
+                onSearchClick = { navController.navigate(EventPopDestinations.SEARCH) },
                 onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) }
             )
         }
         composable(EventPopDestinations.PROFILE) {
-            HomeScreen(
-                selectedDiscover = false,
-                selectedEvents = false,
-                selectedProfile = true,
-                selectedSettings = false,
-                onNavDiscover = { navController.navigate(EventPopDestinations.DISCOVER) },
-                onNavEvents = { navController.navigate(EventPopDestinations.EVENTS) },
-                onNavProfile = { },
-                onNavSettings = { navController.navigate(EventPopDestinations.SETTINGS) },
-                onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) }
-            )
+            ProfileScreen(navController = navController)
         }
         composable(EventPopDestinations.SETTINGS) {
-            HomeScreen(
-                selectedDiscover = false,
-                selectedEvents = false,
-                selectedProfile = false,
-                selectedSettings = true,
-                onNavDiscover = { navController.navigate(EventPopDestinations.DISCOVER) },
-                onNavEvents = { navController.navigate(EventPopDestinations.EVENTS) },
-                onNavProfile = { navController.navigate(EventPopDestinations.PROFILE) },
-                onNavSettings = { },
-                onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) }
-            )
+            SettingsScreen(navController = navController)
+        }
+        composable(EventPopDestinations.SEARCH) {
+            SearchScreen(navController = navController)
         }
         composable(EventPopDestinations.FILTER_EVENTS) {
             FilterEventsScreen(navController = navController)

@@ -33,4 +33,32 @@
     <string name="rsvp_success_message">You\'re in! See you there 🎉</string>
     <string name="price_ugx">UGX %1$s</string>
     <string name="free">Free</string>
+
+    <!-- Search -->
+    <string name="search_title">Search events</string>
+    <string name="search_hint">Search by title or area</string>
+    <string name="search_no_results">No events match your search.</string>
+
+    <!-- Profile -->
+    <string name="profile_title">Profile</string>
+    <string name="profile_avatar_initial">K</string>
+    <string name="profile_display_name">Kalanzi</string>
+    <string name="profile_email">kalanzi@example.com</string>
+    <string name="profile_stat_events">Events</string>
+    <string name="profile_stat_events_value">12</string>
+    <string name="profile_stat_saved">Saved</string>
+    <string name="profile_stat_saved_value">3</string>
+    <string name="profile_stat_rsvps">RSVPs</string>
+    <string name="profile_stat_rsvps_value">8</string>
+    <string name="profile_section_upcoming">Your upcoming</string>
+    <string name="profile_upcoming_empty">No upcoming events yet. RSVP from the feed to see them here.</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_notifications">Notifications</string>
+    <string name="settings_push_notifications">Push notifications</string>
+    <string name="settings_event_reminders">Event reminders</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_about_body">EventPop helps you discover events in Kampala. Preferences are stored on this device only.</string>
+    <string name="settings_version">Version %1$s</string>
 </resources>
