@@ -42,7 +42,13 @@ import com.android.example.eventpop.ui.theme.SubtitleGray
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(navController: NavController) {
+fun ProfileScreen(
+    navController: NavController,
+    onNavDiscover: () -> Unit,
+    onNavEvents: () -> Unit,
+    onNavProfile: () -> Unit,
+    onNavSettings: () -> Unit
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -62,10 +68,10 @@ fun ProfileScreen(navController: NavController) {
                 selectedEvents = false,
                 selectedProfile = true,
                 selectedSettings = false,
-                onNavDiscover = { navController.navigate(EventPopDestinations.DISCOVER) },
-                onNavEvents = { navController.navigate(EventPopDestinations.EVENTS) },
-                onNavProfile = { },
-                onNavSettings = { navController.navigate(EventPopDestinations.SETTINGS) }
+                onNavDiscover = onNavDiscover,
+                onNavEvents = onNavEvents,
+                onNavProfile = onNavProfile,
+                onNavSettings = onNavSettings
             )
         }
     ) { innerPadding ->

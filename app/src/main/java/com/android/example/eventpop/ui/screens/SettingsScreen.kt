@@ -38,7 +38,13 @@ import com.android.example.eventpop.ui.theme.SubtitleGray
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(navController: NavController) {
+fun SettingsScreen(
+    navController: NavController,
+    onNavDiscover: () -> Unit,
+    onNavEvents: () -> Unit,
+    onNavProfile: () -> Unit,
+    onNavSettings: () -> Unit
+) {
     var pushNotifications by remember { mutableStateOf(true) }
     var eventReminders by remember { mutableStateOf(true) }
     val context = LocalContext.current
@@ -70,10 +76,10 @@ fun SettingsScreen(navController: NavController) {
                 selectedEvents = false,
                 selectedProfile = false,
                 selectedSettings = true,
-                onNavDiscover = { navController.navigate(EventPopDestinations.DISCOVER) },
-                onNavEvents = { navController.navigate(EventPopDestinations.EVENTS) },
-                onNavProfile = { navController.navigate(EventPopDestinations.PROFILE) },
-                onNavSettings = { }
+                onNavDiscover = onNavDiscover,
+                onNavEvents = onNavEvents,
+                onNavProfile = onNavProfile,
+                onNavSettings = onNavSettings
             )
         }
     ) { innerPadding ->
