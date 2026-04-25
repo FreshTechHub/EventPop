@@ -30,35 +30,5 @@ data class Event(
 }
 
 object SampleEvents {
-    val list: List<Event> = listOf(
-        Event(
-            id = "1",
-            title = "Street Food Fest",
-            location = "Bugolobi",
-            timeInfo = "Today 5:00 PM",
-            priceInfo = "Free",
-            imageUrl = null,
-            category = EventCategory.FOOD
-        ),
-        Event(
-            id = "2",
-            title = "Zumba in the Park",
-            location = "Kyadondo",
-            timeInfo = "In 30 mins",
-            priceInfo = "UGX 5K",
-            imageUrl = null,
-            category = EventCategory.WELLNESS
-        ),
-        Event(
-            id = "3",
-            title = "DJ Party",
-            location = "Ntinda",
-            timeInfo = "Starts at 9:30 PM",
-            priceInfo = "Free Entry",
-            imageUrl = null,
-            category = EventCategory.MUSIC,
-            rating = 3.5f,
-            rsvpCount = 62
-        )
-    )
+    val list: List<Event> = emptyList()
 }

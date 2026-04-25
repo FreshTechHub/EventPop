@@ -97,6 +97,7 @@ fun DiscoverScreen(
     onNavEvents: () -> Unit,
     onNavMap: () -> Unit,
     onNavDiscover: () -> Unit,
+    onNavFavorites: () -> Unit,
     onNavProfile: () -> Unit,
     onEventClick: (com.android.example.eventpop.data.Event) -> Unit = {}
 ) {
@@ -160,10 +161,12 @@ fun DiscoverScreen(
                 selectedEvents = false,
                 selectedMap = false,
                 selectedDiscover = true,
+                selectedFavorites = false,
                 selectedProfile = false,
                 onNavEvents = onNavEvents,
                 onNavMap = onNavMap,
                 onNavDiscover = onNavDiscover,
+                onNavFavorites = onNavFavorites,
                 onNavProfile = onNavProfile
             )
         },

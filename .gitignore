@@ -21,3 +21,11 @@ local.properties
 .kotlin/
 *.hprof
 project_tree.txt
+
+# Additional ignores
+build/
+app/build/
+.idea/
+*.jks
+*.keystore
+.env

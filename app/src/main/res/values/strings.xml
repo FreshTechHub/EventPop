@@ -8,6 +8,7 @@
     <string name="nav_events">Events</string>
     <string name="nav_map">Map</string>
     <string name="nav_discover">Discover</string>
+    <string name="nav_favorites">Favorites</string>
     <string name="nav_profile">Profile</string>
     <string name="filter_events_title">Filter Events</string>
     <string name="filter_reset">Reset</string>

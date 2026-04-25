@@ -2,10 +2,12 @@ package com.android.example.eventpop.ui.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
@@ -25,10 +27,12 @@ fun EventPopBottomBar(
     selectedEvents: Boolean,
     selectedMap: Boolean,
     selectedDiscover: Boolean,
+    selectedFavorites: Boolean,
     selectedProfile: Boolean,
     onNavEvents: () -> Unit,
     onNavMap: () -> Unit,
     onNavDiscover: () -> Unit,
+    onNavFavorites: () -> Unit,
     onNavProfile: () -> Unit
 ) {
     NavigationBar(
@@ -82,6 +86,24 @@ fun EventPopBottomBar(
                 )
             },
             label = { Text("Discover") },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = OrangeAccent,
+                selectedTextColor = OrangeAccent,
+                unselectedIconColor = Color.White.copy(alpha = 0.6f),
+                unselectedTextColor = Color.White.copy(alpha = 0.6f),
+                indicatorColor = OrangeAccent.copy(alpha = 0.15f)
+            )
+        )
+        NavigationBarItem(
+            selected = selectedFavorites,
+            onClick = onNavFavorites,
+            icon = {
+                Icon(
+                    imageVector = if (selectedFavorites) Icons.Filled.Favorite else Icons.Outlined.Favorite,
+                    contentDescription = "Favorites"
+                )
+            },
+            label = { Text("Favorites") },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = OrangeAccent,
                 selectedTextColor = OrangeAccent,

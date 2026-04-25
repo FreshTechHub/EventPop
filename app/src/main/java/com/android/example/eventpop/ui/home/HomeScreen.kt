@@ -107,10 +107,12 @@ fun HomeScreen(
     onNavEvents: () -> Unit = {},
     onNavMap: () -> Unit = {},
     onNavDiscover: () -> Unit = {},
+    onNavFavorites: () -> Unit = {},
     onNavProfile: () -> Unit = {},
     selectedEvents: Boolean = true,
     selectedMap: Boolean = false,
     selectedDiscover: Boolean = false,
+    selectedFavorites: Boolean = false,
     selectedProfile: Boolean = false
 ) {
     val displayedEvents = if (currentFilter != null) currentFilter.applyTo(events) else events
@@ -147,10 +149,12 @@ fun HomeScreen(
                 selectedEvents = selectedEvents,
                 selectedMap = selectedMap,
                 selectedDiscover = selectedDiscover,
+                selectedFavorites = selectedFavorites,
                 selectedProfile = selectedProfile,
                 onNavEvents = onNavEvents,
                 onNavMap = onNavMap,
                 onNavDiscover = onNavDiscover,
+                onNavFavorites = onNavFavorites,
                 onNavProfile = onNavProfile
             )
         }

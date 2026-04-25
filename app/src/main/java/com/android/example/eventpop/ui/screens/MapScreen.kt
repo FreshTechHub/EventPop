@@ -28,18 +28,16 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.android.example.eventpop.data.EventCategory
-import com.android.example.eventpop.data.SampleEvents
 import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.AppBarNavy
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
-import com.google.maps.android.compose.rememberCameraPositionState
+import org.maplibre.android.MapLibre
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
+import org.maplibre.android.annotations.MarkerOptions
 
 // Static pins for events - in a real app these come from the Event data model lat/lng fields
 private data class EventPin(
@@ -49,25 +47,7 @@ private data class EventPin(
     val category: EventCategory
 )
 
-private val eventPins = listOf(
-    EventPin("Street Food Fest", "Bugolobi", LatLng(0.3210, 32.5990), EventCategory.FOOD),
-    EventPin("Zumba in the Park", "Kyadondo", LatLng(0.3350, 32.5720), EventCategory.WELLNESS),
-    EventPin("DJ Party", "Ntinda", LatLng(0.3580, 32.6050), EventCategory.MUSIC),
-    EventPin("Art Exhibition", "Kololo", LatLng(0.3400, 32.5840), EventCategory.ART),
-    EventPin("Comedy Night", "Wandegeya", LatLng(0.3290, 32.5730), EventCategory.COMEDY),
-    EventPin("Rooftop Jazz", "Nakasero", LatLng(0.3180, 32.5820), EventCategory.MUSIC),
-    EventPin("Sunday Brunch", "Muyenga", LatLng(0.3080, 32.5900), EventCategory.FOOD),
-    EventPin("Wellness Retreat", "Lubowa", LatLng(0.2950, 32.5480), EventCategory.WELLNESS)
-)
-
-private fun EventCategory.markerHue(): Float = when (this) {
-    EventCategory.MUSIC -> BitmapDescriptorFactory.HUE_CYAN
-    EventCategory.FOOD -> BitmapDescriptorFactory.HUE_ORANGE
-    EventCategory.COMEDY -> BitmapDescriptorFactory.HUE_VIOLET
-    EventCategory.WELLNESS -> BitmapDescriptorFactory.HUE_GREEN
-    EventCategory.ART -> BitmapDescriptorFactory.HUE_RED
-    EventCategory.VENUE -> BitmapDescriptorFactory.HUE_YELLOW
-}
+private val eventPins = emptyList<EventPin>()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +55,7 @@ fun MapScreen(
     onNavEvents: () -> Unit,
     onNavMap: () -> Unit,
     onNavDiscover: () -> Unit,
+    onNavFavorites: () -> Unit,
     onNavProfile: () -> Unit
 ) {
     Scaffold(
@@ -95,10 +76,12 @@ fun MapScreen(
                 selectedEvents = false,
                 selectedMap = true,
                 selectedDiscover = false,
+                selectedFavorites = false,
                 selectedProfile = false,
                 onNavEvents = onNavEvents,
                 onNavMap = onNavMap,
                 onNavDiscover = onNavDiscover,
+                onNavFavorites = onNavFavorites,
                 onNavProfile = onNavProfile
             )
         }
@@ -118,24 +101,35 @@ fun MapScreen(
                     Text("Map Preview", color = Color.White)
                 }
             } else {
-                val kampalaLatLng = LatLng(0.3350, 32.5900)
-                val cameraPositionState = rememberCameraPositionState {
-                    position = CameraPosition.fromLatLngZoom(kampalaLatLng, 12f)
-                }
-                GoogleMap(
+                AndroidView(
                     modifier = Modifier.fillMaxSize(),
-                    cameraPositionState = cameraPositionState,
-                    properties = remember { MapProperties(isMyLocationEnabled = false) }
-                ) {
-                    eventPins.forEach { pin ->
-                        Marker(
-                            state = MarkerState(position = pin.latLng),
-                            title = pin.title,
-                            snippet = pin.location,
-                            icon = BitmapDescriptorFactory.defaultMarker(pin.category.markerHue())
-                        )
+                    factory = { context ->
+                        MapLibre.getInstance(context)
+                        MapView(context).apply {
+                            getMapAsync { map ->
+                                map.setStyle(Style.Builder().fromUri("https://demotiles.maplibre.org/style.json")) { style ->
+                                    // Map is ready
+                                }
+                                
+                                val kampalaLatLng = LatLng(0.3350, 32.5900)
+                                val position = CameraPosition.Builder()
+                                    .target(kampalaLatLng)
+                                    .zoom(12.0)
+                                    .build()
+                                map.cameraPosition = position
+                                
+                                eventPins.forEach { pin ->
+                                    map.addMarker(
+                                        MarkerOptions()
+                                            .position(pin.latLng)
+                                            .title(pin.title)
+                                            .snippet(pin.location)
+                                    )
+                                }
+                            }
+                        }
                     }
-                }
+                )
             }
 
             // Legend overlay

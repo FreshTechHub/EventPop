@@ -84,6 +84,7 @@ fun ProfileScreen(
     onNavEvents: () -> Unit,
     onNavMap: () -> Unit,
     onNavDiscover: () -> Unit,
+    onNavFavorites: () -> Unit,
     onNavProfile: () -> Unit
 ) {
     val context = LocalContext.current
@@ -294,10 +295,12 @@ fun ProfileScreen(
                 selectedEvents = false,
                 selectedMap = false,
                 selectedDiscover = false,
+                selectedFavorites = false,
                 selectedProfile = true,
                 onNavEvents = onNavEvents,
                 onNavMap = onNavMap,
                 onNavDiscover = onNavDiscover,
+                onNavFavorites = onNavFavorites,
                 onNavProfile = onNavProfile
             )
         }

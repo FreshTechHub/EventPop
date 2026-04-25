@@ -23,6 +23,7 @@ import com.android.example.eventpop.ui.viewmodel.EventDetailViewModel
 import com.android.example.eventpop.ui.home.HomeScreen
 import com.android.example.eventpop.ui.screens.DiscoverScreen
 import com.android.example.eventpop.ui.screens.EventDetailScreen
+import com.android.example.eventpop.ui.screens.FavoritesScreen
 import com.android.example.eventpop.ui.screens.FilterEventsScreen
 import com.android.example.eventpop.ui.screens.MapScreen
 import com.android.example.eventpop.ui.screens.ProfileScreen
@@ -31,6 +32,7 @@ object EventPopDestinations {
     const val EVENTS = "events"
     const val MAP = "map"
     const val DISCOVER = "discover"
+    const val FAVOURITES = "favourites"
     const val PROFILE = "profile"
     const val FILTER_EVENTS = "filter_events"
     const val FILTER_RESULT_KEY = "event_filter"
@@ -76,10 +78,11 @@ fun EventPopNavGraph(
         }
     }
 
-    val navEvents   = { navigateToTab(EventPopDestinations.EVENTS) }
-    val navMap      = { navigateToTab(EventPopDestinations.MAP) }
-    val navDiscover = { navigateToTab(EventPopDestinations.DISCOVER) }
-    val navProfile  = { navigateToTab(EventPopDestinations.PROFILE) }
+    val navEvents    = { navigateToTab(EventPopDestinations.EVENTS) }
+    val navMap       = { navigateToTab(EventPopDestinations.MAP) }
+    val navDiscover  = { navigateToTab(EventPopDestinations.DISCOVER) }
+    val navFavorites = { navigateToTab(EventPopDestinations.FAVOURITES) }
+    val navProfile   = { navigateToTab(EventPopDestinations.PROFILE) }
 
     NavHost(
         navController = navController,
@@ -97,10 +100,12 @@ fun EventPopNavGraph(
                 selectedEvents = true,
                 selectedMap = false,
                 selectedDiscover = false,
+                selectedFavorites = false,
                 selectedProfile = false,
                 onNavEvents = navEvents,
                 onNavMap = navMap,
                 onNavDiscover = navDiscover,
+                onNavFavorites = navFavorites,
                 onNavProfile = navProfile,
                 onSearchClick = { navController.navigate(EventPopDestinations.DISCOVER) },
                 onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) }
@@ -113,6 +118,7 @@ fun EventPopNavGraph(
                 onNavEvents = navEvents,
                 onNavMap = navMap,
                 onNavDiscover = navDiscover,
+                onNavFavorites = navFavorites,
                 onNavProfile = navProfile
             )
         }
@@ -123,8 +129,20 @@ fun EventPopNavGraph(
                 onNavEvents = navEvents,
                 onNavMap = navMap,
                 onNavDiscover = navDiscover,
+                onNavFavorites = navFavorites,
                 onNavProfile = navProfile,
                 onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) }
+            )
+        }
+
+        // Favorites tab
+        composable(EventPopDestinations.FAVOURITES) {
+            FavoritesScreen(
+                onNavEvents = navEvents,
+                onNavMap = navMap,
+                onNavDiscover = navDiscover,
+                onNavFavorites = navFavorites,
+                onNavProfile = navProfile
             )
         }
 
@@ -134,6 +152,7 @@ fun EventPopNavGraph(
                 onNavEvents = navEvents,
                 onNavMap = navMap,
                 onNavDiscover = navDiscover,
+                onNavFavorites = navFavorites,
                 onNavProfile = navProfile
             )
         }
