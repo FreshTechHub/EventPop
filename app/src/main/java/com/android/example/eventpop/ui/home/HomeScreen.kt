@@ -40,7 +40,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -65,15 +64,8 @@ import com.android.example.eventpop.ui.theme.StarFilled
 import com.android.example.eventpop.ui.theme.StarUnfilled
 import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.SubtitleGray
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
-import com.google.maps.android.compose.rememberCameraPositionState
 
-private val MapHeight = 220.dp
+
 private val EventThumbnailHeight = 80.dp
 private val EventThumbnailWidth = 80.dp
 private val CardElevation = 2.dp
@@ -111,16 +103,15 @@ fun HomeScreen(
     onSeeAllHotEvents: () -> Unit = {},
     onEventRsvp: (Event) -> Unit = {},
     onEventClick: (Event) -> Unit = {},
-    onMenuClick: () -> Unit = {},
     onSearchClick: () -> Unit = {},
-    onNavDiscover: () -> Unit = {},
     onNavEvents: () -> Unit = {},
+    onNavMap: () -> Unit = {},
+    onNavDiscover: () -> Unit = {},
     onNavProfile: () -> Unit = {},
-    onNavSettings: () -> Unit = {},
-    selectedDiscover: Boolean = false,
     selectedEvents: Boolean = true,
-    selectedProfile: Boolean = false,
-    selectedSettings: Boolean = false
+    selectedMap: Boolean = false,
+    selectedDiscover: Boolean = false,
+    selectedProfile: Boolean = false
 ) {
     val displayedEvents = if (currentFilter != null) currentFilter.applyTo(events) else events
     Scaffold(
@@ -133,15 +124,6 @@ fun HomeScreen(
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.fillMaxWidth()
                     )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onMenuClick) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_menu),
-                            contentDescription = "Menu",
-                            tint = Color.White
-                        )
-                    }
                 },
                 actions = {
                     IconButton(onClick = onSearchClick) {
@@ -162,14 +144,14 @@ fun HomeScreen(
         },
         bottomBar = {
             EventPopBottomBar(
-                selectedDiscover = selectedDiscover,
                 selectedEvents = selectedEvents,
+                selectedMap = selectedMap,
+                selectedDiscover = selectedDiscover,
                 selectedProfile = selectedProfile,
-                selectedSettings = selectedSettings,
-                onNavDiscover = onNavDiscover,
                 onNavEvents = onNavEvents,
-                onNavProfile = onNavProfile,
-                onNavSettings = onNavSettings
+                onNavMap = onNavMap,
+                onNavDiscover = onNavDiscover,
+                onNavProfile = onNavProfile
             )
         }
     ) { innerPadding ->
@@ -179,16 +161,13 @@ fun HomeScreen(
                 .padding(innerPadding),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item {
-                MapSection()
-            }
             if (onFilterClick != null) {
                 item {
                     OutlinedButton(
                         onClick = onFilterClick,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeAccent),
                         border = androidx.compose.foundation.BorderStroke(1.dp, OrangeAccent),
                         shape = RoundedCornerShape(12.dp)
@@ -210,75 +189,6 @@ fun HomeScreen(
                     event = event,
                     onRsvp = { onEventRsvp(event) },
                     onClick = { onEventClick(event) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MapSection() {
-    if (LocalInspectionMode.current) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(MapHeight)
-                .clip(RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp))
-                .background(Color.LightGray),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Map View Placeholder",
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.DarkGray
-            )
-        }
-    } else {
-        // Kampala center
-        val kampalaLatLng = LatLng(0.3476, 32.5825)
-        val cameraPositionState = rememberCameraPositionState {
-            position = CameraPosition.fromLatLngZoom(kampalaLatLng, 12f)
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(MapHeight)
-                .clip(RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp))
-        ) {
-            GoogleMap(
-                modifier = Modifier.fillMaxSize(),
-                cameraPositionState = cameraPositionState,
-                properties = remember { com.google.maps.android.compose.MapProperties(isMyLocationEnabled = false) }
-            ) {
-                // Teal - music
-                Marker(
-                    state = MarkerState(position = LatLng(0.3500, 32.5800)),
-                    title = "Music",
-                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_CYAN)
-                )
-                // Orange - venue
-                Marker(
-                    state = MarkerState(position = LatLng(0.3450, 32.5850)),
-                    title = "Venue",
-                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE)
-                )
-                // Purple - comedy
-                Marker(
-                    state = MarkerState(position = LatLng(0.3420, 32.5780)),
-                    title = "Comedy",
-                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_VIOLET)
-                )
-                // Green - wellness
-                Marker(
-                    state = MarkerState(position = LatLng(0.3520, 32.5750)),
-                    title = "Wellness",
-                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)
-                )
-                // Red - art
-                Marker(
-                    state = MarkerState(position = LatLng(0.3480, 32.5900)),
-                    title = "Art",
-                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
                 )
             }
         }
@@ -471,3 +381,4 @@ private fun HomeScreenPreview() {
         HomeScreen(events = SampleEvents.list, selectedEvents = true)
     }
 }
+

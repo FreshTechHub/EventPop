@@ -22,6 +22,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,34 +46,35 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddLocation
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Fastfood
+import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarRate
-import androidx.compose.material.icons.filled.TheaterComedy
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgeDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -101,6 +103,9 @@ import androidx.compose.ui.unit.sp
 import com.android.example.eventpop.ui.theme.EventPopTheme
 import kotlinx.coroutines.launch
 
+private const val PREFS_NAME = "eventpop_prefs"
+private const val KEY_FIRST_LAUNCH = "first_launch_done"
+
 // Color constants
 private val LandingBackground = Color(0xFF0D1117)
 private val GradientOrange = Color(0xFFFF6B00)
@@ -124,14 +129,33 @@ data class EventPreview(
     val isFree: Boolean
 )
 
+private val ugandaCities = listOf(
+    "Kampala", "Entebbe", "Jinja", "Mbarara", "Gulu",
+    "Mbale", "Lira", "Masaka", "Fort Portal", "Arua"
+)
+
 class LandingPageActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Check if this is the first launch
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val firstLaunchDone = prefs.getBoolean(KEY_FIRST_LAUNCH, false)
+
+        if (firstLaunchDone) {
+            // Skip landing page on subsequent launches
+            startActivity(Intent(this, MainActivity::class.java))
+            finish()
+            return
+        }
+
         setContent {
             EventPopTheme {
                 LandingPage(onGetStarted = {
+                    prefs.edit().putBoolean(KEY_FIRST_LAUNCH, true).apply()
                     startActivity(Intent(this, MainActivity::class.java))
+                    finish()
                 })
             }
         }
@@ -155,51 +179,211 @@ private fun LandingPage(onGetStarted: () -> Unit) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
+    var showCreateAccount by remember { mutableStateOf(false) }
+    var showCityPicker by remember { mutableStateOf(false) }
+    var selectedCity by remember { mutableStateOf<String?>(null) }
+    var accountEmail by remember { mutableStateOf("") }
+    var accountName by remember { mutableStateOf("") }
+
     BackHandler {
         context.findActivity()?.finish()
     }
 
-    Scaffold(
-        containerColor = LandingBackground
-    ) { innerPadding ->
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .background(LandingBackground)
-                .padding(innerPadding),
-            contentPadding = PaddingValues(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            item(key = "hero") {
-                HeroSection(
-                    listState = listState,
-                    index = 0,
-                    onGetStarted = onGetStarted,
-                    onLearnMore = {
-                        coroutineScope.launch {
-                            listState.animateScrollToItem(index = 2)
+    // Inline overlays over the scaffold
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(containerColor = LandingBackground) { innerPadding ->
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(LandingBackground)
+                    .padding(innerPadding),
+                contentPadding = PaddingValues(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                item(key = "hero") {
+                    HeroSection(
+                        listState = listState,
+                        index = 0,
+                        onGetStarted = onGetStarted,
+                        onCreateAccount = { showCreateAccount = true },
+                        onAddCity = { showCityPicker = true },
+                        selectedCity = selectedCity
+                    )
+                }
+                item(key = "stats") {
+                    StatsRow(listState = listState, index = 1)
+                }
+                item(key = "features") {
+                    FeaturesSection(listState = listState, index = 2)
+                }
+                item(key = "events") {
+                    EventPreviewSection(listState = listState, index = 3)
+                }
+                item(key = "cta") {
+                    CtaSection(listState = listState, index = 4, onGetStarted = onGetStarted)
+                }
+            }
+        }
+
+        // Create Account sheet
+        if (showCreateAccount) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .clickable { showCreateAccount = false },
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = false) {},
+                    colors = CardDefaults.cardColors(containerColor = LandingDarkCard),
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Create Account",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = "Close",
+                                tint = TextGray,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clickable { showCreateAccount = false }
+                            )
+                        }
+                        OutlinedTextField(
+                            value = accountName,
+                            onValueChange = { accountName = it },
+                            label = { Text("Full Name") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = GradientOrange,
+                                focusedLabelColor = GradientOrange,
+                                unfocusedBorderColor = TextGray.copy(alpha = 0.5f),
+                                unfocusedLabelColor = TextGray,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            )
+                        )
+                        OutlinedTextField(
+                            value = accountEmail,
+                            onValueChange = { accountEmail = it },
+                            label = { Text("Email") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = GradientOrange,
+                                focusedLabelColor = GradientOrange,
+                                unfocusedBorderColor = TextGray.copy(alpha = 0.5f),
+                                unfocusedLabelColor = TextGray,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            )
+                        )
+                        GradientButton(
+                            text = "Create Account",
+                            onClick = { showCreateAccount = false }
+                        )
+                        TextButton(
+                            onClick = { showCreateAccount = false },
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        ) {
+                            Text("Maybe Later", color = TextGray, fontSize = 13.sp)
                         }
                     }
-                )
+                }
             }
-            item(key = "stats") {
-                StatsRow(listState = listState, index = 1)
-            }
-            item(key = "features") {
-                FeaturesSection(listState = listState, index = 2)
-            }
-            item(key = "steps") {
-                HowItWorksSection(listState = listState, index = 3)
-            }
-            item(key = "events") {
-                EventPreviewSection(listState = listState, index = 4)
-            }
-            item(key = "cta") {
-                CtaSection(listState = listState, index = 5, onGetStarted = onGetStarted)
-            }
-            item(key = "footer") {
-                FooterSection(listState = listState, index = 6)
+        }
+
+        // City picker sheet
+        if (showCityPicker) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .clickable { showCityPicker = false },
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = false) {},
+                    colors = CardDefaults.cardColors(containerColor = LandingDarkCard),
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Choose Your City",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = "Close",
+                                tint = TextGray,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clickable { showCityPicker = false }
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        ugandaCities.forEach { city ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selectedCity = city
+                                        showCityPicker = false
+                                    }
+                                    .padding(vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = city,
+                                    color = if (city == selectedCity) GradientOrange else Color.White,
+                                    fontWeight = if (city == selectedCity) FontWeight.Bold else FontWeight.Normal
+                                )
+                                if (city == selectedCity) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(GradientOrange)
+                                    )
+                                }
+                            }
+                            if (city != ugandaCities.last()) {
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -222,7 +406,9 @@ private fun HeroSection(
     listState: LazyListState,
     index: Int,
     onGetStarted: () -> Unit,
-    onLearnMore: () -> Unit
+    onCreateAccount: () -> Unit,
+    onAddCity: () -> Unit,
+    selectedCity: String?
 ) {
     var visible by remember { mutableStateOf(false) }
     val show = sectionVisible(listState, index)
@@ -245,8 +431,7 @@ private fun HeroSection(
             HeroRadarBackground()
 
             Column(
-                modifier = Modifier
-                    .fillMaxSize(),
+                modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -265,7 +450,7 @@ private fun HeroSection(
                             modifier = Modifier.size(28.dp)
                         )
                         Text(
-                            text = "PopUp Kampala",
+                            text = "EventPop",
                             color = Color.White,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 16.sp
@@ -290,7 +475,7 @@ private fun HeroSection(
                         color = Color.White,
                     )
                     Text(
-                        text = "Find pop-ups, food fests, concerts & hidden events in Kampala",
+                        text = "Find pop-ups, food fests, concerts & hidden events near you",
                         fontSize = 15.sp,
                         color = TextGray
                     )
@@ -304,10 +489,56 @@ private fun HeroSection(
                         text = "Get Started",
                         onClick = onGetStarted
                     )
-                    OutlinedLandingButton(
-                        text = "Learn More",
-                        onClick = onLearnMore
-                    )
+                    // Optional: Create Account
+                    Button(
+                        onClick = onCreateAccount,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.1f),
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(50),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Create Account", fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                    }
+                    // Optional: Add City
+                    Button(
+                        onClick = onAddCity,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = if (selectedCity != null) GradientOrange else Color.White.copy(alpha = 0.6f)
+                        ),
+                        shape = RoundedCornerShape(50),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (selectedCity != null) GradientOrange else Color.White.copy(alpha = 0.25f)
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.LocationCity,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (selectedCity != null) selectedCity else "Add Your City",
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 14.sp
+                        )
+                    }
                 }
             }
         }
@@ -329,10 +560,7 @@ private fun HeroRadarBackground() {
 
     val alpha = 1f - (radius - 40f) / (200f - 40f)
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val center = Offset(size.width / 2f, size.height / 2f)
             drawCircle(
@@ -432,7 +660,7 @@ private fun FeaturesSection(listState: LazyListState, index: Int) {
     }
 
     val features = listOf(
-        Feature(Icons.Filled.Map, "Live Map", "See events pinned across Kampala in real time."),
+        Feature(Icons.Filled.Map, "Live Map", "See events pinned across your city in real time."),
         Feature(Icons.Filled.NotificationsActive, "Instant Alerts", "Get notified when new pop-ups go live."),
         Feature(Icons.Filled.ConfirmationNumber, "Quick RSVP", "Join events with a single tap."),
         Feature(Icons.Filled.Category, "Event Types", "Filter by music, food, art & more."),
@@ -530,124 +758,6 @@ private fun FeatureCard(feature: Feature) {
 }
 
 @Composable
-private fun HowItWorksSection(listState: LazyListState, index: Int) {
-    var visible by remember { mutableStateOf(false) }
-    val show = sectionVisible(listState, index)
-    LaunchedEffect(show) {
-        if (show) visible = true
-    }
-
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(animationSpec = tween(500))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "3 Simple Steps",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp
-            )
-
-            val steps = listOf(
-                "Download App" to "Install PopUp Kampala from the Play Store.",
-                "Allow Location" to "Let us find events closest to you.",
-                "Discover & RSVP" to "Browse, vibe check and tap to join."
-            )
-
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-                steps.forEachIndexed { idx, (title, desc) ->
-                    StepItem(
-                        index = idx + 1,
-                        title = title,
-                        description = desc,
-                        showConnector = idx < steps.lastIndex
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun StepItem(
-    index: Int,
-    title: String,
-    description: String,
-    showConnector: Boolean
-) {
-    Row(
-        modifier = Modifier.padding(vertical = 4.dp),
-        verticalAlignment = Alignment.Top
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(GradientOrange, GradientPurple)
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = index.toString(),
-                    color = Color.White,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 14.sp
-                )
-            }
-            if (showConnector) {
-                Canvas(
-                    modifier = Modifier
-                        .height(40.dp)
-                        .width(2.dp)
-                ) {
-                    val pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f)
-                    drawLine(
-                        color = GradientOrange.copy(alpha = 0.6f),
-                        start = Offset(size.width / 2, 0f),
-                        end = Offset(size.width / 2, size.height),
-                        strokeWidth = 4f,
-                        pathEffect = pathEffect
-                    )
-                }
-            }
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = title,
-                color = Color.White,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp
-            )
-            Text(
-                text = description,
-                color = TextGray,
-                fontSize = 12.sp
-            )
-        }
-    }
-}
-
-@Composable
 private fun EventPreviewSection(listState: LazyListState, index: Int) {
     var visible by remember { mutableStateOf(false) }
     val show = sectionVisible(listState, index)
@@ -671,23 +781,23 @@ private fun EventPreviewSection(listState: LazyListState, index: Int) {
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "Hot Events Right Now",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
-                    )
-                    Icon(
-                        imageVector = Icons.Filled.Whatshot,
-                        contentDescription = "Hot events",
-                        tint = GradientOrange,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Hot Events Right Now",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
+                )
+                Icon(
+                    imageVector = Icons.Filled.Whatshot,
+                    contentDescription = "Hot events",
+                    tint = GradientOrange,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
 
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -703,8 +813,7 @@ private fun EventPreviewSection(listState: LazyListState, index: Int) {
 @Composable
 private fun EventCard(event: EventPreview) {
     Card(
-        modifier = Modifier
-            .width(220.dp),
+        modifier = Modifier.width(220.dp),
         colors = CardDefaults.cardColors(containerColor = LandingDarkCard),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -759,8 +868,7 @@ private fun EventCard(event: EventPreview) {
                 )
                 Badge(
                     containerColor = if (event.isFree) GradientOrange.copy(alpha = 0.2f) else LandingNavy,
-                    contentColor = GradientOrange,
-                    modifier = Modifier
+                    contentColor = GradientOrange
                 ) {
                     Text(
                         text = if (event.isFree) "FREE" else "PAID",
@@ -801,11 +909,9 @@ private fun CtaSection(
                 )
                 .padding(20.dp)
         ) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "Ready to Explore Kampala?",
+                    text = "Ready to Explore?",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp
@@ -815,114 +921,17 @@ private fun CtaSection(
                     color = TextLightGray,
                     fontSize = 13.sp
                 )
-
                 GradientButton(
                     text = "Get Started",
                     backgroundBrush = Brush.horizontalGradient(
                         colors = listOf(Color.White, TextLightGray)
                     ),
                     contentColor = LandingBackground,
-                    modifier = Modifier
-                        .fillMaxWidth(),
-                    indicationRadius = 300.dp,
+                    modifier = Modifier.fillMaxWidth(),
                     onClick = onGetStarted
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun FooterSection(listState: LazyListState, index: Int) {
-    var visible by remember { mutableStateOf(false) }
-    val show = sectionVisible(listState, index)
-    LaunchedEffect(show) {
-        if (show) visible = true
-    }
-
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(animationSpec = tween(500))
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-            colors = CardDefaults.cardColors(containerColor = LandingDarkCard),
-            shape = RoundedCornerShape(20.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.LocationOn,
-                        contentDescription = "Logo",
-                        tint = GradientOrange,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "PopUp Kampala",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                }
-                Text(
-                    text = "Your city. Your events. Your vibe.",
-                    color = TextGray,
-                    fontSize = 12.sp
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SocialCircle(
-                        icon = Icons.Filled.CameraAlt,
-                        contentDescription = "Instagram"
-                    )
-                    SocialCircle(
-                        icon = Icons.Filled.Share,
-                        contentDescription = "Share"
-                    )
-                    SocialCircle(
-                        icon = Icons.Filled.Phone,
-                        contentDescription = "WhatsApp"
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SocialCircle(icon: ImageVector, contentDescription: String) {
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(GradientOrange, GradientPurple)
-                )
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = Color.White,
-            modifier = Modifier.size(24.dp)
-        )
     }
 }
 
@@ -932,7 +941,6 @@ private fun GradientButton(
     modifier: Modifier = Modifier,
     backgroundBrush: Brush = Brush.horizontalGradient(colors = listOf(GradientOrange, GradientPurple)),
     contentColor: Color = Color.White,
-    indicationRadius: Dp = 200.dp,
     onClick: () -> Unit
 ) {
     Button(
@@ -963,32 +971,5 @@ private fun GradientButton(
                 fontSize = 14.sp
             )
         }
-    }
-}
-
-@Composable
-private fun OutlinedLandingButton(
-    text: String,
-    onClick: () -> Unit
-) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color.Transparent,
-            contentColor = Color.White
-        ),
-        shape = RoundedCornerShape(50),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.6f)),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp)
-    ) {
-        Text(
-            text = text,
-            fontWeight = FontWeight.Medium,
-            fontSize = 14.sp
-        )
     }
 }

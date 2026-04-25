@@ -19,21 +19,19 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.android.example.eventpop.data.EventFilter
+import com.android.example.eventpop.ui.viewmodel.EventDetailViewModel
 import com.android.example.eventpop.ui.home.HomeScreen
+import com.android.example.eventpop.ui.screens.DiscoverScreen
 import com.android.example.eventpop.ui.screens.EventDetailScreen
 import com.android.example.eventpop.ui.screens.FilterEventsScreen
+import com.android.example.eventpop.ui.screens.MapScreen
 import com.android.example.eventpop.ui.screens.ProfileScreen
-import com.android.example.eventpop.ui.screens.SearchScreen
-import com.android.example.eventpop.ui.screens.SettingsScreen
-import com.android.example.eventpop.ui.viewmodel.EventDetailViewModel
-import kotlinx.coroutines.delay
 
 object EventPopDestinations {
-    const val DISCOVER = "discover"
     const val EVENTS = "events"
+    const val MAP = "map"
+    const val DISCOVER = "discover"
     const val PROFILE = "profile"
-    const val SETTINGS = "settings"
-    const val SEARCH = "search"
     const val FILTER_EVENTS = "filter_events"
     const val FILTER_RESULT_KEY = "event_filter"
     const val EVENT_DETAIL = "event_detail/{eventId}"
@@ -51,7 +49,7 @@ fun EventPopNavGraph(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Double back to exit logic on Events tab
+    // Double-back to exit on home screen
     if (currentRoute == EventPopDestinations.EVENTS) {
         BackHandler {
             if (backPressedOnce) {
@@ -59,7 +57,6 @@ fun EventPopNavGraph(
             } else {
                 backPressedOnce = true
                 Toast.makeText(context, "Press back again to exit", Toast.LENGTH_SHORT).show()
-                // Reset flag after 2 seconds
                 android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                     backPressedOnce = false
                 }, 2000)
@@ -79,10 +76,16 @@ fun EventPopNavGraph(
         }
     }
 
+    val navEvents   = { navigateToTab(EventPopDestinations.EVENTS) }
+    val navMap      = { navigateToTab(EventPopDestinations.MAP) }
+    val navDiscover = { navigateToTab(EventPopDestinations.DISCOVER) }
+    val navProfile  = { navigateToTab(EventPopDestinations.PROFILE) }
+
     NavHost(
         navController = navController,
         startDestination = EventPopDestinations.EVENTS
     ) {
+        // Events tab
         composable(EventPopDestinations.EVENTS) {
             val eventsBackStackEntry = navController.getBackStackEntry(EventPopDestinations.EVENTS)
             val filterResult by eventsBackStackEntry.savedStateHandle
@@ -91,64 +94,66 @@ fun EventPopNavGraph(
             HomeScreen(
                 onFilterClick = { navController.navigate(EventPopDestinations.FILTER_EVENTS) },
                 currentFilter = filterResult,
-                selectedDiscover = false,
                 selectedEvents = true,
+                selectedMap = false,
+                selectedDiscover = false,
                 selectedProfile = false,
-                selectedSettings = false,
-                onNavDiscover = { navigateToTab(EventPopDestinations.DISCOVER) },
-                onNavEvents = { navigateToTab(EventPopDestinations.EVENTS) },
-                onNavProfile = { navigateToTab(EventPopDestinations.PROFILE) },
-                onNavSettings = { navigateToTab(EventPopDestinations.SETTINGS) },
-                onSearchClick = { navController.navigate(EventPopDestinations.SEARCH) },
+                onNavEvents = navEvents,
+                onNavMap = navMap,
+                onNavDiscover = navDiscover,
+                onNavProfile = navProfile,
+                onSearchClick = { navController.navigate(EventPopDestinations.DISCOVER) },
                 onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) }
             )
         }
+
+        // Map tab
+        composable(EventPopDestinations.MAP) {
+            MapScreen(
+                onNavEvents = navEvents,
+                onNavMap = navMap,
+                onNavDiscover = navDiscover,
+                onNavProfile = navProfile
+            )
+        }
+
+        // Discover tab
+        composable(EventPopDestinations.DISCOVER) {
+            DiscoverScreen(
+                onNavEvents = navEvents,
+                onNavMap = navMap,
+                onNavDiscover = navDiscover,
+                onNavProfile = navProfile,
+                onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) }
+            )
+        }
+
+        // Profile tab
+        composable(EventPopDestinations.PROFILE) {
+            ProfileScreen(
+                onNavEvents = navEvents,
+                onNavMap = navMap,
+                onNavDiscover = navDiscover,
+                onNavProfile = navProfile
+            )
+        }
+
+        // Full-screen event detail (off-tab)
         composable(
             route = EventPopDestinations.EVENT_DETAIL,
-            arguments = listOf(navArgument(EventPopDestinations.EVENT_DETAIL_ID_ARG) { type = NavType.StringType })
+            arguments = listOf(navArgument(EventPopDestinations.EVENT_DETAIL_ID_ARG) {
+                type = NavType.StringType
+            })
         ) { backStackEntry ->
-            val viewModel: EventDetailViewModel = viewModel()
+            val viewModel: EventDetailViewModel = viewModel(backStackEntry)
             EventDetailScreen(
                 navController = navController,
                 viewModel = viewModel,
                 navBackStackEntry = backStackEntry
             )
         }
-        composable(EventPopDestinations.DISCOVER) {
-            HomeScreen(
-                selectedDiscover = true,
-                selectedEvents = false,
-                selectedProfile = false,
-                selectedSettings = false,
-                onNavDiscover = { navigateToTab(EventPopDestinations.DISCOVER) },
-                onNavEvents = { navigateToTab(EventPopDestinations.EVENTS) },
-                onNavProfile = { navigateToTab(EventPopDestinations.PROFILE) },
-                onNavSettings = { navigateToTab(EventPopDestinations.SETTINGS) },
-                onSearchClick = { navController.navigate(EventPopDestinations.SEARCH) },
-                onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) }
-            )
-        }
-        composable(EventPopDestinations.PROFILE) {
-            ProfileScreen(
-                navController = navController,
-                onNavDiscover = { navigateToTab(EventPopDestinations.DISCOVER) },
-                onNavEvents = { navigateToTab(EventPopDestinations.EVENTS) },
-                onNavProfile = { navigateToTab(EventPopDestinations.PROFILE) },
-                onNavSettings = { navigateToTab(EventPopDestinations.SETTINGS) }
-            )
-        }
-        composable(EventPopDestinations.SETTINGS) {
-            SettingsScreen(
-                navController = navController,
-                onNavDiscover = { navigateToTab(EventPopDestinations.DISCOVER) },
-                onNavEvents = { navigateToTab(EventPopDestinations.EVENTS) },
-                onNavProfile = { navigateToTab(EventPopDestinations.PROFILE) },
-                onNavSettings = { navigateToTab(EventPopDestinations.SETTINGS) }
-            )
-        }
-        composable(EventPopDestinations.SEARCH) {
-            SearchScreen(navController = navController)
-        }
+
+        // Filter modal (off-tab)
         composable(EventPopDestinations.FILTER_EVENTS) {
             FilterEventsScreen(navController = navController)
         }
