@@ -107,7 +107,7 @@ fun MapScreen(
                         MapLibre.getInstance(context)
                         MapView(context).apply {
                             getMapAsync { map ->
-                                map.setStyle(Style.Builder().fromUri("https://demotiles.maplibre.org/style.json")) { style ->
+                                map.setStyle(Style.Builder().fromUri("https://tiles.openfreemap.org/styles/liberty")) { style ->
                                     // Map is ready
                                 }
                                 

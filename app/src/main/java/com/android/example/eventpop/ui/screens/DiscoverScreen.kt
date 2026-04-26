@@ -79,11 +79,11 @@ private data class CategoryItem(
 )
 
 private val allCategories = listOf(
-    CategoryItem("Music", Icons.Filled.MusicNote, Color(0xFF0D9488)),
-    CategoryItem("Food", Icons.Filled.Fastfood, Color(0xFFEA580C)),
-    CategoryItem("Comedy", Icons.Filled.TheaterComedy, Color(0xFF7C3AED)),
-    CategoryItem("Art", Icons.Filled.Palette, Color(0xFFDC2626)),
-    CategoryItem("Wellness", Icons.Filled.SelfImprovement, Color(0xFF059669))
+    CategoryItem("Music", Icons.Filled.MusicNote, Color(0xFF0D9488.toInt())),
+    CategoryItem("Food", Icons.Filled.Fastfood, Color(0xFFEA580C.toInt())),
+    CategoryItem("Comedy", Icons.Filled.TheaterComedy, Color(0xFF7C3AED.toInt())),
+    CategoryItem("Art", Icons.Filled.Palette, Color(0xFFDC2626.toInt())),
+    CategoryItem("Wellness", Icons.Filled.SelfImprovement, Color(0xFF059669.toInt()))
 )
 
 private val popularSearches = listOf(
