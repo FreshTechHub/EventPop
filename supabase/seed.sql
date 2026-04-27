@@ -1,0 +1,8 @@
+INSERT INTO events (id, title, location, area, date, start_time, end_time, price, is_free, category, description, organizer_name, rsvp_count, rating, is_interested, image_url) VALUES 
+('11111111-1111-1111-1111-111111111111', 'Street Food Fest', 'Bugolobi Market', 'Bugolobi', 'Today', '5:00 PM', '9:00 PM', 'Free', true, 'FOOD', 'Join us for an evening of the best street food Kampala has to offer.', 'Kampala Street Eats', 124, 4.6, false, null),
+('22222222-2222-2222-2222-222222222222', 'Live Band Night', 'Kololo Lounge', 'Kololo', 'Friday, June 14', '8:00 PM', '11:00 PM', 'UGX 10K', false, 'MUSIC', 'An unforgettable night of live music featuring local bands.', 'Kololo Lounge', 89, 4.4, false, null),
+('33333333-3333-3333-3333-333333333333', 'DJ Party', 'Ntinda Hub', 'Ntinda', 'Saturday, June 15', '9:30 PM', '2:00 AM', 'Free Entry', true, 'MUSIC', 'The biggest DJ night in Ntinda. Top local DJs, premium sound system.', 'Ntinda Events', 62, 3.5, false, null),
+('44444444-4444-4444-4444-444444444444', 'Zumba in the Park', 'Kyadondo', 'Kyadondo', 'Sunday', '8:00 AM', '10:00 AM', 'UGX 5K', false, 'WELLNESS', 'Morning workout session to start your Sunday right.', 'Kyadondo Fitness', 45, 4.8, false, null),
+('55555555-5555-5555-5555-555555555555', 'Art Exhibition', 'Kololo', 'Kololo', 'Next Monday', '10:00 AM', '6:00 PM', 'Free', true, 'ART', 'Showcasing the best local art pieces in Kololo.', 'Kololo Art Hub', 12, 4.2, false, null),
+('66666666-6666-6666-6666-666666666666', 'Comedy Night', 'Wandegeya', 'Wandegeya', 'Thursday', '7:00 PM', '10:00 PM', 'UGX 20K', false, 'COMEDY', 'Laugh your heart out with the funniest stand-up comedians.', 'Wandegeya Comedy Club', 150, 4.9, false, null)
+ON CONFLICT (id) DO NOTHING;
