@@ -60,6 +60,7 @@ import com.android.example.eventpop.data.TimeRange
 import com.android.example.eventpop.ui.navigation.EventPopDestinations
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.viewmodel.FilterEventsViewModel
+import com.android.example.eventpop.ui.mappers.icon
 
 private val FilterScreenBackground = Color(0xFF0D1117)
 private val FilterChipSelected = Color(0xFF2196F3)
@@ -287,7 +288,7 @@ private fun FlowRowChips(
                 label = { Text(type.label) },
                 leadingIcon = {
                     Icon(
-                        imageVector = if (selected) Icons.Filled.Check else type.icon,
+                        imageVector = if (selected) Icons.Filled.Check else type.icon(),
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
                         tint = SectionHeaderColor
