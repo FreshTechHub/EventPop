@@ -100,7 +100,11 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.jan.supabase.auth.handleDeeplinks
+import com.android.example.eventpop.data.SupabaseService
+import androidx.compose.ui.window.Dialog
 import com.android.example.eventpop.ui.theme.EventPopTheme
+import androidx.compose.material3.CircularProgressIndicator
 import kotlinx.coroutines.launch
 
 private const val PREFS_NAME = "eventpop_prefs"
@@ -141,22 +145,36 @@ class LandingPageActivity : ComponentActivity() {
 
         // Check if this is the first launch
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val firstLaunchDone = prefs.getBoolean(KEY_FIRST_LAUNCH, false)
-
-        if (firstLaunchDone) {
-            // Skip landing page on subsequent launches
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
-            return
-        }
 
         setContent {
             EventPopTheme {
-                LandingPage(onGetStarted = {
-                    prefs.edit().putBoolean(KEY_FIRST_LAUNCH, true).apply()
-                    startActivity(Intent(this, MainActivity::class.java))
-                    finish()
-                })
+                var isCheckingAuth by remember { mutableStateOf(true) }
+
+                LaunchedEffect(Unit) {
+                    // Handle deep link if any
+                    intent?.let {
+                        try {
+                            SupabaseService.handleDeeplinks(it)
+                        } catch (e: Exception) {
+                            android.util.Log.e("LandingPage", "Deep link error", e)
+                        }
+                    }
+
+                    // Check session
+                    if (SupabaseService.isUserLoggedIn()) {
+                        startActivity(Intent(this@LandingPageActivity, MainActivity::class.java))
+                        finish()
+                    }
+                    isCheckingAuth = false
+                }
+
+                if (!isCheckingAuth) {
+                    LandingPage()
+                } else {
+                    Box(modifier = Modifier.fillMaxSize().background(LandingBackground), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = GradientOrange)
+                    }
+                }
             }
         }
     }
@@ -174,216 +192,230 @@ fun Context.findActivity(): Activity? {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LandingPage(onGetStarted: () -> Unit) {
+private fun LandingPage() {
     val context = LocalContext.current
-    val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
     var showCreateAccount by remember { mutableStateOf(false) }
-    var showCityPicker by remember { mutableStateOf(false) }
-    var selectedCity by remember { mutableStateOf<String?>(null) }
+    var showLogin by remember { mutableStateOf(false) }
     var accountEmail by remember { mutableStateOf("") }
     var accountName by remember { mutableStateOf("") }
+    var authMessage by remember { mutableStateOf<String?>(null) }
 
     BackHandler {
         context.findActivity()?.finish()
     }
 
-    // Inline overlays over the scaffold
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(containerColor = LandingBackground) { innerPadding ->
-            LazyColumn(
-                state = listState,
+    Box(modifier = Modifier.fillMaxSize().background(LandingBackground)) {
+        // Simple Welcome UI
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.LocationOn,
+                contentDescription = "Logo",
+                tint = GradientOrange,
+                modifier = Modifier.size(80.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Welcome to EventPop",
+                color = Color.White,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Discover what's happening around you",
+                color = TextGray,
+                fontSize = 16.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(48.dp))
+
+            GradientButton(
+                text = "Login",
+                onClick = { showLogin = true }
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = { showCreateAccount = true },
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(LandingBackground)
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                    .fillMaxWidth()
+                    .height(56.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White.copy(alpha = 0.1f),
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                item(key = "hero") {
-                    HeroSection(
-                        listState = listState,
-                        index = 0,
-                        onGetStarted = onGetStarted,
-                        onCreateAccount = { showCreateAccount = true },
-                        onAddCity = { showCityPicker = true },
-                        selectedCity = selectedCity
-                    )
-                }
-                item(key = "stats") {
-                    StatsRow(listState = listState, index = 1)
-                }
-                item(key = "features") {
-                    FeaturesSection(listState = listState, index = 2)
-                }
-                item(key = "events") {
-                    EventPreviewSection(listState = listState, index = 3)
-                }
-                item(key = "cta") {
-                    CtaSection(listState = listState, index = 4, onGetStarted = onGetStarted)
+                Text("Sign Up", fontWeight = FontWeight.Medium, fontSize = 16.sp)
+            }
+        }
+
+        // Status Message Dialog
+        if (authMessage != null) {
+            Dialog(onDismissRequest = { authMessage = null }) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = LandingDarkCard),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("Authentication", color = Color.White, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(authMessage!!, color = TextLightGray, textAlign = TextAlign.Center)
+                        Spacer(modifier = Modifier.height(24.dp))
+                        TextButton(onClick = { authMessage = null }) {
+                            Text("OK", color = GradientOrange)
+                        }
+                    }
                 }
             }
+        }
+
+        // Login sheet
+        if (showLogin) {
+            AuthSheet(
+                title = "Login",
+                email = accountEmail,
+                onEmailChange = { accountEmail = it },
+                name = null,
+                onNameChange = {},
+                onClose = { showLogin = false },
+                onAction = {
+                    coroutineScope.launch {
+                        try {
+                            SupabaseService.signIn(accountEmail)
+                            // If successful, navigate to MainActivity
+                            context.startActivity(Intent(context, MainActivity::class.java))
+                            context.findActivity()?.finish()
+                        } catch (e: Exception) {
+                            authMessage = "Login failed: ${e.message ?: "Unknown error"}. Make sure your email is verified."
+                        }
+                        showLogin = false
+                    }
+                },
+                actionText = "Login"
+            )
         }
 
         // Create Account sheet
         if (showCreateAccount) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .clickable { showCreateAccount = false },
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = false) {},
-                    colors = CardDefaults.cardColors(containerColor = LandingDarkCard),
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "Create Account",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp
-                            )
-                            Icon(
-                                Icons.Filled.Close,
-                                contentDescription = "Close",
-                                tint = TextGray,
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clickable { showCreateAccount = false }
-                            )
+            AuthSheet(
+                title = "Create Account",
+                email = accountEmail,
+                onEmailChange = { accountEmail = it },
+                name = accountName,
+                onNameChange = { accountName = it },
+                onClose = { showCreateAccount = false },
+                onAction = {
+                    coroutineScope.launch {
+                        try {
+                            SupabaseService.signUp(accountEmail, accountName)
+                            // If successful, navigate to MainActivity (assuming email confirmation is disabled)
+                            context.startActivity(Intent(context, MainActivity::class.java))
+                            context.findActivity()?.finish()
+                        } catch (e: Exception) {
+                            authMessage = "Sign up failed: ${e.message}"
                         }
-                        OutlinedTextField(
-                            value = accountName,
-                            onValueChange = { accountName = it },
-                            label = { Text("Full Name") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = GradientOrange,
-                                focusedLabelColor = GradientOrange,
-                                unfocusedBorderColor = TextGray.copy(alpha = 0.5f),
-                                unfocusedLabelColor = TextGray,
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
-                            )
-                        )
-                        OutlinedTextField(
-                            value = accountEmail,
-                            onValueChange = { accountEmail = it },
-                            label = { Text("Email") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = GradientOrange,
-                                focusedLabelColor = GradientOrange,
-                                unfocusedBorderColor = TextGray.copy(alpha = 0.5f),
-                                unfocusedLabelColor = TextGray,
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
-                            )
-                        )
-                        GradientButton(
-                            text = "Create Account",
-                            onClick = { showCreateAccount = false }
-                        )
-                        TextButton(
-                            onClick = { showCreateAccount = false },
-                            modifier = Modifier.align(Alignment.CenterHorizontally)
-                        ) {
-                            Text("Maybe Later", color = TextGray, fontSize = 13.sp)
-                        }
+                        showCreateAccount = false
                     }
-                }
-            }
+                },
+                actionText = "Create Account"
+            )
         }
+    }
+}
 
-        // City picker sheet
-        if (showCityPicker) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .clickable { showCityPicker = false },
-                contentAlignment = Alignment.BottomCenter
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AuthSheet(
+    title: String,
+    email: String,
+    onEmailChange: (String) -> Unit,
+    name: String?,
+    onNameChange: (String) -> Unit,
+    onClose: () -> Unit,
+    onAction: () -> Unit,
+    actionText: String
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.6f))
+            .clickable { onClose() },
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = false) {},
+            colors = CardDefaults.cardColors(containerColor = LandingDarkCard),
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = false) {},
-                    colors = CardDefaults.cardColors(containerColor = LandingDarkCard),
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "Choose Your City",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp
-                            )
-                            Icon(
-                                Icons.Filled.Close,
-                                contentDescription = "Close",
-                                tint = TextGray,
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clickable { showCityPicker = false }
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        ugandaCities.forEach { city ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        selectedCity = city
-                                        showCityPicker = false
-                                    }
-                                    .padding(vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = city,
-                                    color = if (city == selectedCity) GradientOrange else Color.White,
-                                    fontWeight = if (city == selectedCity) FontWeight.Bold else FontWeight.Normal
-                                )
-                                if (city == selectedCity) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .clip(CircleShape)
-                                            .background(GradientOrange)
-                                    )
-                                }
-                            }
-                            if (city != ugandaCities.last()) {
-                                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-                            }
-                        }
-                    }
+                    Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = "Close",
+                        tint = TextGray,
+                        modifier = Modifier.size(24.dp).clickable { onClose() }
+                    )
                 }
+
+                if (name != null) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = onNameChange,
+                        label = { Text("Full Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GradientOrange,
+                            focusedLabelColor = GradientOrange,
+                            unfocusedBorderColor = TextGray.copy(alpha = 0.5f),
+                            unfocusedLabelColor = TextGray,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        )
+                    )
+                }
+
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = onEmailChange,
+                    label = { Text("Email") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GradientOrange,
+                        focusedLabelColor = GradientOrange,
+                        unfocusedBorderColor = TextGray.copy(alpha = 0.5f),
+                        unfocusedLabelColor = TextGray,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    )
+                )
+
+                GradientButton(
+                    text = actionText,
+                    onClick = onAction
+                )
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }
