@@ -33,10 +33,14 @@ import com.android.example.eventpop.ui.screens.FavoritesScreen
 import com.android.example.eventpop.ui.screens.FilterEventsScreen
 import com.android.example.eventpop.ui.screens.MapScreen
 import com.android.example.eventpop.ui.screens.ProfileScreen
+import com.android.example.eventpop.ui.screens.SearchScreen
 import com.android.example.eventpop.ui.viewmodel.DiscoverViewModel
 import com.android.example.eventpop.ui.viewmodel.EventDetailViewModel
+import com.android.example.eventpop.ui.viewmodel.FavoritesViewModel
 import com.android.example.eventpop.ui.viewmodel.HomeViewModel
 import com.android.example.eventpop.ui.viewmodel.MapViewModel
+import com.android.example.eventpop.ui.viewmodel.ProfileViewModel
+import com.android.example.eventpop.ui.viewmodel.SearchViewModel
 import kotlinx.coroutines.launch
 
 object EventPopDestinations {
@@ -47,6 +51,7 @@ object EventPopDestinations {
     const val PROFILE = "profile"
     const val FILTER_EVENTS = "filter_events"
     const val FILTER_RESULT_KEY = "event_filter"
+    const val SEARCH = "search"
     const val EVENT_DETAIL = "event_detail/{eventId}"
     const val EVENT_DETAIL_ID_ARG = "eventId"
 
@@ -129,7 +134,8 @@ fun EventPopNavGraph(
                 onNavDiscover = navDiscover,
                 onNavFavorites = navFavorites,
                 onNavProfile = navProfile,
-                onSearchClick = { navController.navigate(EventPopDestinations.DISCOVER) },
+                onSearchClick = { navController.navigate(EventPopDestinations.SEARCH) },
+                onSeeAllHotEvents = navDiscover,
                 onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) },
                 onEventRsvp = { homeViewModel.rsvpEvent(it.id) }
             )
@@ -165,7 +171,14 @@ fun EventPopNavGraph(
         }
 
         composable(EventPopDestinations.FAVOURITES) {
+            val favoritesViewModel: FavoritesViewModel = viewModel(factory = viewModelFactory)
+            LaunchedEffect(Unit) {
+                favoritesViewModel.refresh()
+            }
+            val favoritesUiState by favoritesViewModel.uiState.collectAsState()
             FavoritesScreen(
+                uiState = favoritesUiState,
+                onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) },
                 onNavEvents = navEvents,
                 onNavMap = navMap,
                 onNavDiscover = navDiscover,
@@ -174,8 +187,24 @@ fun EventPopNavGraph(
             )
         }
 
+        composable(EventPopDestinations.SEARCH) {
+            val searchViewModel: SearchViewModel = viewModel(factory = viewModelFactory)
+            val searchUiState by searchViewModel.uiState.collectAsState()
+            SearchScreen(
+                navController = navController,
+                uiState = searchUiState,
+                onQueryChange = searchViewModel::setQuery
+            )
+        }
+
         composable(EventPopDestinations.PROFILE) {
+            val profileViewModel: ProfileViewModel = viewModel(factory = viewModelFactory)
+            LaunchedEffect(Unit) {
+                profileViewModel.refresh()
+            }
+            val profileUiState by profileViewModel.uiState.collectAsState()
             ProfileScreen(
+                uiState = profileUiState,
                 onNavEvents = navEvents,
                 onNavMap = navMap,
                 onNavDiscover = navDiscover,

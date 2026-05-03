@@ -10,6 +10,7 @@ import com.android.example.eventpop.data.Event
 @Immutable
 data class HomeUiState(
     val events: List<Event> = emptyList(),
+    val hotEvents: List<Event> = emptyList(),
     val isLoading: Boolean = false
 )
 
@@ -32,4 +33,25 @@ data class EventDetailUiState(
 data class MapUiState(
     val eventPins: List<Event> = emptyList(),
     val isLoading: Boolean = false
+)
+
+@Immutable
+data class SearchUiState(
+    val query: String = "",
+    val results: List<Event> = emptyList(),
+    val isLoading: Boolean = false
+)
+
+@Immutable
+data class FavoritesUiState(
+    val favorites: List<Event> = emptyList(),
+    val isLoading: Boolean = false,
+    val needsSignIn: Boolean = false
+)
+
+@Immutable
+data class ProfileUiState(
+    val email: String = "",
+    val displayName: String = "Guest",
+    val isLoggedIn: Boolean = false
 )

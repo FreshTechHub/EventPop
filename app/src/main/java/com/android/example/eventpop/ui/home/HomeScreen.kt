@@ -6,10 +6,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.OutlinedButton
@@ -44,7 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -54,7 +58,6 @@ import com.android.example.eventpop.data.EventCategory
 import com.android.example.eventpop.data.EventFilter
 import com.android.example.eventpop.data.EventLocation
 import com.android.example.eventpop.data.EventType
-import com.android.example.eventpop.data.SampleEvents
 import com.android.example.eventpop.data.TimeRange
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.CardBackground
@@ -186,19 +189,23 @@ fun HomeScreen(
                     }
                 }
             }
-            
+
+            if (uiState.hotEvents.isNotEmpty()) {
+                item {
+                    HotEventsSection(
+                        hotEvents = uiState.hotEvents,
+                        onSeeAll = onSeeAllHotEvents,
+                        onEventClick = onEventClick
+                    )
+                }
+            }
+
             if (uiState.isLoading) {
                 item {
                     Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = OrangeAccent)
                     }
                 }
-            }
-            
-            item {
-                HotEventsSection(
-                    onSeeAll = onSeeAllHotEvents
-                )
             }
             items(displayedEvents) { event ->
                 EventCard(
@@ -212,7 +219,11 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HotEventsSection(onSeeAll: () -> Unit) {
+private fun HotEventsSection(
+    hotEvents: List<Event>,
+    onSeeAll: () -> Unit,
+    onEventClick: (Event) -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -221,27 +232,65 @@ private fun HotEventsSection(onSeeAll: () -> Unit) {
         colors = CardDefaults.cardColors(containerColor = HotSectionNavy),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "\uD83D\uDD25 ${stringResource(R.string.hot_events_title)}",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = stringResource(R.string.see_all),
-                color = OrangeAccent,
-                style = MaterialTheme.typography.labelLarge,
+        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            Row(
                 modifier = Modifier
-                    .padding(start = 8.dp)
-                    .clickable(onClick = onSeeAll)
-            )
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "\uD83D\uDD25 ${stringResource(R.string.hot_events_title)}",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = stringResource(R.string.see_all),
+                    color = OrangeAccent,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .clickable(onClick = onSeeAll)
+                )
+            }
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                items(hotEvents, key = { it.id }) { event ->
+                    Card(
+                        modifier = Modifier
+                            .width(168.dp)
+                            .clickable { onEventClick(event) },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color.White.copy(alpha = 0.1f)
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = event.title,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.titleSmall,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = event.subtitle,
+                                color = Color.White.copy(alpha = 0.75f),
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,10 +25,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,28 +34,20 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.android.example.eventpop.R
 import com.android.example.eventpop.data.Event
-import com.android.example.eventpop.data.SampleEvents
+import com.android.example.eventpop.ui.mvc.SearchUiState
 import com.android.example.eventpop.ui.navigation.EventPopDestinations
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.CardBackground
+import com.android.example.eventpop.ui.theme.OrangeAccent
 import com.android.example.eventpop.ui.theme.SubtitleGray
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen(navController: NavController) {
-    var query by remember { mutableStateOf("") }
-    val filtered = remember(query) {
-        val q = query.trim().lowercase()
-        if (q.isEmpty()) SampleEvents.list
-        else {
-            SampleEvents.list.filter { event ->
-                event.title.lowercase().contains(q) ||
-                    event.location.lowercase().contains(q) ||
-                    event.subtitle.lowercase().contains(q)
-            }
-        }
-    }
-
+fun SearchScreen(
+    navController: NavController,
+    uiState: SearchUiState,
+    onQueryChange: (String) -> Unit
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -83,8 +72,8 @@ fun SearchScreen(navController: NavController) {
                 .padding(horizontal = 16.dp)
         ) {
             OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
+                value = uiState.query,
+                onValueChange = onQueryChange,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp, bottom = 12.dp),
@@ -94,18 +83,28 @@ fun SearchScreen(navController: NavController) {
                 },
                 singleLine = true
             )
-            if (filtered.isEmpty()) {
+            if (uiState.isLoading) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator(color = OrangeAccent)
+                }
+            }
+            if (!uiState.isLoading && uiState.results.isEmpty()) {
                 Text(
                     text = stringResource(R.string.search_no_results),
                     style = MaterialTheme.typography.bodyLarge,
                     color = SubtitleGray,
                     modifier = Modifier.padding(top = 24.dp)
                 )
-            } else {
+            } else if (!uiState.isLoading) {
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filtered, key = { it.id }) { event ->
+                    items(uiState.results, key = { it.id }) { event ->
                         SearchResultRow(
                             event = event,
                             onClick = {

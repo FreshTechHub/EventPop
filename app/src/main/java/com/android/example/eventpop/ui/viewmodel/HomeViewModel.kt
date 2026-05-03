@@ -2,6 +2,7 @@ package com.android.example.eventpop.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.android.example.eventpop.data.Event
 import com.android.example.eventpop.data.EventRepository
 import com.android.example.eventpop.ui.mvc.HomeUiState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,11 +21,24 @@ class HomeViewModel(
 
     private val isRefreshing = MutableStateFlow(false)
 
+    private fun computeHotEvents(events: List<Event>): List<Event> =
+        events.asSequence()
+            .sortedWith(
+                compareByDescending<Event> { it.rating ?: 0f }
+                    .thenByDescending { it.rsvpCount ?: 0 }
+            )
+            .take(6)
+            .toList()
+
     val uiState: StateFlow<HomeUiState> = combine(
         eventRepository.observeEvents(),
         isRefreshing
     ) { events, loading ->
-        HomeUiState(events = events, isLoading = loading)
+        HomeUiState(
+            events = events,
+            hotEvents = computeHotEvents(events),
+            isLoading = loading
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),

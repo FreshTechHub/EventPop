@@ -42,7 +42,3 @@ data class Event(
 ) {
     val subtitle: String get() = "$location · $timeInfo · $priceInfo"
 }
-
-object SampleEvents {
-    val list: List<Event> = emptyList()
-}

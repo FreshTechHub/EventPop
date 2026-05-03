@@ -47,4 +47,16 @@ class EventRepository(
 
     suspend fun searchEventsRemote(query: String): List<Event> =
         SupabaseService.searchEventsRemote(query)
+
+    suspend fun loadFavoriteEvents(): List<Event> {
+        val ids = SupabaseService.fetchFavoriteEventIdsForCurrentUser()
+        if (ids.isEmpty()) return emptyList()
+        return SupabaseService.fetchEventsByIds(ids)
+    }
+
+    suspend fun isEventInterested(eventId: String): Boolean =
+        SupabaseService.isEventInterested(eventId)
+
+    suspend fun setEventInterested(eventId: String, interested: Boolean): Boolean =
+        SupabaseService.setEventInterested(eventId, interested)
 }

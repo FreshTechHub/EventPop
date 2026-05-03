@@ -16,6 +16,9 @@ import io.github.jan.supabase.storage.storage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -83,6 +86,21 @@ object SupabaseService {
 
     fun isUserLoggedIn(): Boolean {
         return auth?.currentSessionOrNull() != null
+    }
+
+    fun currentProfileSnapshot(): UserProfileSnapshot {
+        val user = auth?.currentUserOrNull()
+            ?: return UserProfileSnapshot(email = null, displayName = null, isLoggedIn = false)
+        val meta = user.userMetadata
+        val fullName = meta?.get("full_name")?.let { el ->
+            (el as? JsonPrimitive)?.content
+                ?: el.toString().trim().removeSurrounding("\"")
+        }?.takeIf { it.isNotBlank() }
+        return UserProfileSnapshot(
+            email = user.email,
+            displayName = fullName ?: user.email?.substringBefore("@"),
+            isLoggedIn = true
+        )
     }
 
     suspend fun signOut() {
@@ -213,5 +231,83 @@ object SupabaseService {
     suspend fun rsvpToEvent(eventId: String): Boolean = withContext(Dispatchers.IO) {
         delay(500)
         true
+    }
+
+    @Serializable
+    private data class EventInterestIdRow(
+        @SerialName("event_id") val eventId: String
+    )
+
+    @Serializable
+    private data class EventInterestInsert(
+        @SerialName("event_id") val eventId: String,
+        @SerialName("user_id") val userId: String
+    )
+
+    suspend fun isEventInterested(eventId: String): Boolean = withContext(Dispatchers.IO) {
+        val pg = postgrest ?: return@withContext false
+        val uid = auth?.currentUserOrNull()?.id ?: return@withContext false
+        return@withContext try {
+            pg["event_interests"]
+                .select(columns = Columns.raw("event_id")) {
+                    filter {
+                        eq("event_id", eventId)
+                        eq("user_id", uid)
+                    }
+                }
+                .decodeList<EventInterestIdRow>()
+                .isNotEmpty()
+        } catch (e: Exception) {
+            Log.w("SupabaseService", "isEventInterested: ${e.message}")
+            false
+        }
+    }
+
+    suspend fun setEventInterested(eventId: String, interested: Boolean): Boolean = withContext(Dispatchers.IO) {
+        val pg = postgrest ?: return@withContext false
+        val uid = auth?.currentUserOrNull()?.id ?: return@withContext false
+        return@withContext try {
+            if (interested) {
+                pg["event_interests"].insert(EventInterestInsert(eventId = eventId, userId = uid))
+            } else {
+                pg["event_interests"].delete {
+                    filter {
+                        eq("event_id", eventId)
+                        eq("user_id", uid)
+                    }
+                }
+            }
+            true
+        } catch (e: Exception) {
+            Log.e("SupabaseService", "setEventInterested: ${e.message}", e)
+            false
+        }
+    }
+
+    /**
+     * Event ids the signed-in user marked in [public.event_interests].
+     */
+    suspend fun fetchFavoriteEventIdsForCurrentUser(): List<String> = withContext(Dispatchers.IO) {
+        val pg = postgrest ?: return@withContext emptyList()
+        val uid = auth?.currentUserOrNull()?.id ?: return@withContext emptyList()
+        try {
+            pg["event_interests"]
+                .select(columns = Columns.raw("event_id")) {
+                    filter { eq("user_id", uid) }
+                }
+                .decodeList<EventInterestIdRow>()
+                .map { it.eventId }
+                .distinct()
+        } catch (e: Exception) {
+            Log.e("SupabaseService", "fetchFavoriteEventIds: ${e.message}", e)
+            emptyList()
+        }
+    }
+
+    suspend fun fetchEventsByIds(eventIds: List<String>): List<Event> = withContext(Dispatchers.IO) {
+        if (eventIds.isEmpty()) return@withContext emptyList()
+        eventIds.distinct().mapNotNull { id ->
+            fetchEventByIdRemote(id)
+        }
     }
 }

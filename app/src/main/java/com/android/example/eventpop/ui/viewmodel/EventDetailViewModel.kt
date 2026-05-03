@@ -40,10 +40,21 @@ class EventDetailViewModel(
         viewModelScope.launch {
             eventRepository.refreshEvent(eventId)
         }
+        viewModelScope.launch {
+            val interested = eventRepository.isEventInterested(eventId)
+            _uiState.update { it.copy(isInterested = interested) }
+        }
     }
 
     fun toggleInterested() {
-        _uiState.update { it.copy(isInterested = !it.isInterested) }
+        val ev = _uiState.value.event ?: return
+        viewModelScope.launch {
+            val next = !_uiState.value.isInterested
+            val ok = eventRepository.setEventInterested(ev.id, next)
+            if (ok) {
+                _uiState.update { it.copy(isInterested = next) }
+            }
+        }
     }
 
     fun submitRsvp() {

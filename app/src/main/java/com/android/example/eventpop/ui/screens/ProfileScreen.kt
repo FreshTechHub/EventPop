@@ -64,6 +64,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.LaunchedEffect
+import com.android.example.eventpop.ui.mvc.ProfileUiState
 import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.CardBackground
@@ -81,6 +83,7 @@ private val ugandaCities = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
+    uiState: ProfileUiState,
     onNavEvents: () -> Unit,
     onNavMap: () -> Unit,
     onNavDiscover: () -> Unit,
@@ -90,8 +93,11 @@ fun ProfileScreen(
 ) {
     val context = LocalContext.current
 
-    var displayName by remember { mutableStateOf("Kalanzi") }
-    val email = "kalanzi@example.com"
+    var localDisplayName by remember(uiState.displayName) { mutableStateOf(uiState.displayName) }
+    LaunchedEffect(uiState.displayName) {
+        localDisplayName = uiState.displayName
+    }
+    val email = uiState.email
     var city by remember { mutableStateOf("Kampala") }
     var notificationsEnabled by remember { mutableStateOf(true) }
 
@@ -100,11 +106,11 @@ fun ProfileScreen(
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showFeedbackDialog by remember { mutableStateOf(false) }
-    var editNameField by remember { mutableStateOf(displayName) }
+    var editNameField by remember { mutableStateOf(localDisplayName) }
     var feedbackText by remember { mutableStateOf("") }
 
     // Initials from display name
-    val initials = displayName.trim()
+    val initials = localDisplayName.trim()
         .split(" ")
         .filter { it.isNotEmpty() }
         .take(2)
@@ -178,7 +184,7 @@ fun ProfileScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (editNameField.isNotBlank()) displayName = editNameField.trim()
+                        if (editNameField.isNotBlank()) localDisplayName = editNameField.trim()
                         showEditUsernameDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
@@ -351,7 +357,7 @@ fun ProfileScreen(
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            text = displayName,
+                            text = localDisplayName,
                             color = Color.White,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
@@ -424,7 +430,7 @@ fun ProfileScreen(
                     icon = Icons.Filled.Edit,
                     label = "Edit Username",
                     onClick = {
-                        editNameField = displayName
+                        editNameField = localDisplayName
                         showEditUsernameDialog = true
                     }
                 )
