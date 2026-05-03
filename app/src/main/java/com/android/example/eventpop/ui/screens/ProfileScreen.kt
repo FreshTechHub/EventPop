@@ -53,6 +53,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,6 +70,7 @@ import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.CardBackground
 import com.android.example.eventpop.ui.theme.OrangeAccent
 import com.android.example.eventpop.ui.theme.SubtitleGray
+import kotlinx.coroutines.launch
 
 private val GradientOrange = Color(0xFFFF6B00)
 private val GradientPurple = Color(0xFF7B2FBE)
@@ -191,6 +193,8 @@ fun ProfileScreen(
         )
     }
 
+    val coroutineScope = rememberCoroutineScope()
+
     // Logout dialog
     if (showLogoutDialog) {
         AlertDialog(
@@ -199,7 +203,21 @@ fun ProfileScreen(
             text = { Text("Are you sure you want to log out of EventPop?") },
             confirmButton = {
                 Button(
-                    onClick = { showLogoutDialog = false /* handle logout */ },
+                    onClick = {
+                        coroutineScope.launch {
+                            try {
+                                com.android.example.eventpop.data.SupabaseService.signOut()
+                                showLogoutDialog = false
+                                // Redirect to landing page
+                                val intent = Intent(context, com.android.example.eventpop.LandingPageActivity::class.java)
+                                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                android.util.Log.e("ProfileScreen", "Logout failed", e)
+                                showLogoutDialog = false
+                            }
+                        }
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
                 ) { Text("Log Out") }
             },

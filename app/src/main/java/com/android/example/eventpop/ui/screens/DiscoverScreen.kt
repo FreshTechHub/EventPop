@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.TheaterComedy
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,7 +48,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
+import com.android.example.eventpop.data.Event
+import com.android.example.eventpop.ui.viewmodel.DiscoverViewModel
+import com.android.example.eventpop.ui.navigation.EventPopBottomBar
+import com.android.example.eventpop.ui.theme.AppBarNavy
+import com.android.example.eventpop.ui.theme.SubtitleGray
+import com.android.example.eventpop.ui.theme.OrangeAccent
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,13 +71,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.android.example.eventpop.data.EventCategory
-import com.android.example.eventpop.data.SampleEvents
-import com.android.example.eventpop.ui.navigation.EventPopBottomBar
-import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.CardBackground
-import com.android.example.eventpop.ui.theme.OrangeAccent
-import com.android.example.eventpop.ui.theme.SubtitleGray
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -99,7 +103,8 @@ fun DiscoverScreen(
     onNavDiscover: () -> Unit,
     onNavFavorites: () -> Unit,
     onNavProfile: () -> Unit,
-    onEventClick: (com.android.example.eventpop.data.Event) -> Unit = {}
+    onEventClick: (com.android.example.eventpop.data.Event) -> Unit = {},
+    viewModel: DiscoverViewModel = viewModel()
 ) {
     var query by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
@@ -108,17 +113,12 @@ fun DiscoverScreen(
     var showCategorySheet by remember { mutableStateOf(false) }
 
     val datePickerState = rememberDatePickerState()
+    val events by viewModel.events.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
 
-    val filteredEvents = remember(query, selectedCategory) {
-        val q = query.trim().lowercase()
-        SampleEvents.list.filter { event ->
-            val matchesQuery = q.isEmpty() ||
-                event.title.lowercase().contains(q) ||
-                event.location.lowercase().contains(q)
-            val matchesCategory = selectedCategory == null ||
-                event.category.displayName.equals(selectedCategory, ignoreCase = true)
-            matchesQuery && matchesCategory
-        }
+    // Trigger search when query changes
+    LaunchedEffect(query) {
+        viewModel.searchEvents(query)
     }
 
     if (showDatePicker) {
@@ -182,7 +182,10 @@ fun DiscoverScreen(
             item {
                 OutlinedTextField(
                     value = query,
-                    onValueChange = { query = it },
+                    onValueChange = { 
+                        query = it
+                        viewModel.searchEvents(it)
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -196,7 +199,10 @@ fun DiscoverScreen(
                     },
                     trailingIcon = {
                         if (query.isNotEmpty()) {
-                            IconButton(onClick = { query = "" }) {
+                            IconButton(onClick = { 
+                                query = "" 
+                                viewModel.loadEvents()
+                            }) {
                                 Icon(
                                     imageVector = Icons.Filled.Close,
                                     contentDescription = "Clear",
@@ -350,15 +356,24 @@ fun DiscoverScreen(
                 }
             }
 
+            // Loading state
+            if (isLoading) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = OrangeAccent)
+                    }
+                }
+            }
+
             // Show search results when query is active
             if (query.isNotEmpty() || selectedCategory != null || selectedDateLabel != null) {
                 item {
                     SectionHeader(
                         icon = Icons.Filled.Search,
-                        title = "Results (${filteredEvents.size})"
+                        title = "Results (${events.size})"
                     )
                 }
-                if (filteredEvents.isEmpty()) {
+                if (events.isEmpty() && !isLoading) {
                     item {
                         Text(
                             text = "No events match your search.",
@@ -367,7 +382,7 @@ fun DiscoverScreen(
                         )
                     }
                 } else {
-                    items(filteredEvents, key = { it.id }) { event ->
+                    items(events, key = { it.id }) { event ->
                         DiscoverEventRow(event = event, onClick = { onEventClick(event) })
                     }
                 }
@@ -407,6 +422,11 @@ fun DiscoverScreen(
                                             isSelected = selectedCategory == cat.label,
                                             onClick = {
                                                 selectedCategory = if (selectedCategory == cat.label) null else cat.label
+                                                if (selectedCategory != null) {
+                                                    viewModel.searchEvents(selectedCategory!!)
+                                                } else {
+                                                    viewModel.loadEvents()
+                                                }
                                             }
                                         )
                                     }

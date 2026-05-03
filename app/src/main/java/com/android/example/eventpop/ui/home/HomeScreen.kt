@@ -24,6 +24,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,7 +34,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,6 +47,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.android.example.eventpop.R
@@ -64,6 +67,7 @@ import com.android.example.eventpop.ui.theme.StarFilled
 import com.android.example.eventpop.ui.theme.StarUnfilled
 import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.SubtitleGray
+import com.android.example.eventpop.ui.viewmodel.HomeViewModel
 
 
 private val EventThumbnailHeight = 80.dp
@@ -97,7 +101,7 @@ private fun EventFilter.applyTo(events: List<Event>): List<Event> {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    events: List<Event> = SampleEvents.list,
+    viewModel: HomeViewModel = viewModel(),
     onFilterClick: (() -> Unit)? = null,
     currentFilter: EventFilter? = null,
     onSeeAllHotEvents: () -> Unit = {},
@@ -115,6 +119,9 @@ fun HomeScreen(
     selectedFavorites: Boolean = false,
     selectedProfile: Boolean = false
 ) {
+    val events by viewModel.events.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    
     val displayedEvents = if (currentFilter != null) currentFilter.applyTo(events) else events
     Scaffold(
         topBar = {
@@ -183,6 +190,15 @@ fun HomeScreen(
                     }
                 }
             }
+            
+            if (isLoading) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = OrangeAccent)
+                    }
+                }
+            }
+            
             item {
                 HotEventsSection(
                     onSeeAll = onSeeAllHotEvents
@@ -377,12 +393,3 @@ private fun StarRating(
         )
     }
 }
-
-@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
-@Composable
-private fun HomeScreenPreview() {
-    EventPopTheme {
-        HomeScreen(events = SampleEvents.list, selectedEvents = true)
-    }
-}
-

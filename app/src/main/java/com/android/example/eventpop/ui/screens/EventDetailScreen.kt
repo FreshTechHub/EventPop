@@ -62,30 +62,32 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavBackStackEntry
-import androidx.navigation.NavController
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.android.example.eventpop.R
-import com.android.example.eventpop.data.model.Event
+import com.android.example.eventpop.data.Event
+import com.android.example.eventpop.ui.theme.OrangeAccent
+import com.android.example.eventpop.ui.theme.AppBarNavy
+import com.android.example.eventpop.ui.theme.SubtitleGray
 import com.android.example.eventpop.ui.theme.ContentGray
 import com.android.example.eventpop.ui.theme.DetailBackground
 import com.android.example.eventpop.ui.theme.FreeGreen
 import com.android.example.eventpop.ui.theme.HeartRed
-import com.android.example.eventpop.ui.theme.OrangeAccent
 import com.android.example.eventpop.ui.theme.RsvpBarNavy
 import com.android.example.eventpop.ui.theme.RsvpSuccessGreen
 import com.android.example.eventpop.ui.theme.GradientPurple
 import com.android.example.eventpop.ui.viewmodel.EventDetailViewModel
+import androidx.navigation.NavController
+import androidx.navigation.NavBackStackEntry
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import kotlinx.coroutines.delay
 
 private val HeroHeight = 280.dp
@@ -284,7 +286,7 @@ private fun HeroSection(event: Event) {
                 .padding(horizontal = 10.dp, vertical = 6.dp)
         ) {
             Text(
-                text = event.category.label,
+                text = event.category.displayName,
                 color = Color.White,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
@@ -315,7 +317,7 @@ private fun TitleAndMetaBlock(event: Event) {
                 Icon(Icons.Filled.LocationOn, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
                 Text(
-                    text = stringResource(R.string.area_kampala, event.area),
+                    text = event.area ?: event.location,
                     color = ContentGray,
                     fontSize = 14.sp
                 )
@@ -323,13 +325,13 @@ private fun TitleAndMetaBlock(event: Event) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.CalendarToday, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
-                Text(text = event.date, color = ContentGray, fontSize = 14.sp)
+                Text(text = event.date ?: event.timeInfo, color = ContentGray, fontSize = 14.sp)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.AccessTime, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
                 Text(
-                    text = stringResource(R.string.time_range, event.startTime, event.endTime),
+                    text = if (event.startTime != null && event.endTime != null) "${event.startTime} - ${event.endTime}" else event.timeInfo,
                     color = ContentGray,
                     fontSize = 14.sp
                 )
@@ -338,7 +340,7 @@ private fun TitleAndMetaBlock(event: Event) {
                 Icon(Icons.Filled.Group, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
                 Text(
-                    text = stringResource(R.string.people_going, event.rsvpCount),
+                    text = "${event.rsvpCount ?: 0} people going",
                     color = ContentGray,
                     fontSize = 14.sp
                 )
@@ -352,7 +354,7 @@ private fun TitleAndMetaBlock(event: Event) {
                 )
             } else {
                 Text(
-                    text = stringResource(R.string.price_ugx, event.price),
+                    text = event.priceInfo,
                     color = OrangeAccent,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
@@ -385,17 +387,18 @@ private fun VibeCheckBlock(event: Event) {
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                val rating = event.rating ?: 0f
                 repeat(5) { index ->
                     Icon(
-                        imageVector = if (index < event.rating.toInt().coerceIn(0, 5)) Icons.Filled.Star else Icons.Outlined.Star,
+                        imageVector = if (index < rating.toInt().coerceIn(0, 5)) Icons.Filled.Star else Icons.Outlined.Star,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),
-                        tint = if (index < event.rating.toInt().coerceIn(0, 5)) OrangeAccent else ContentGray
+                        tint = if (index < rating.toInt().coerceIn(0, 5)) OrangeAccent else ContentGray
                     )
                 }
                 Spacer(Modifier.size(8.dp))
                 Text(
-                    text = stringResource(R.string.rating_out_of_five, event.rating),
+                    text = stringResource(R.string.rating_out_of_five, rating),
                     color = ContentGray,
                     fontSize = 14.sp
                 )
@@ -423,7 +426,7 @@ private fun AboutBlock(event: Event) {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = event.description,
+                text = event.description ?: "No description provided.",
                 color = ContentGray,
                 fontSize = 14.sp,
                 lineHeight = 22.sp
@@ -454,7 +457,7 @@ private fun OrganizerBlock(event: Event) {
                 )
                 Spacer(Modifier.size(4.dp))
                 Text(
-                    text = event.organizerName,
+                    text = event.organizerName ?: "Unknown Organizer",
                     color = Color.White,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
@@ -500,7 +503,7 @@ private fun MapBlock() {
                     .clip(RoundedCornerShape(16.dp))
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(RsvpBarNavy, RsvpBarNavy.copy(alpha = 0.8f))
+                            colors = listOf(AppBarNavy, AppBarNavy.copy(alpha = 0.8f))
                         )
                     ),
                 contentAlignment = Alignment.Center
@@ -532,12 +535,12 @@ private fun EventDetailBottomBar(
     onRsvpClick: () -> Unit
 ) {
     val rsvpButtonColor by animateColorAsState(
-        targetValue = if (rsvpSuccess) RsvpSuccessGreen else Color.Transparent,
+        targetValue = if (rsvpSuccess) Color(0xFF059669) else Color.Transparent,
         animationSpec = tween(300),
         label = "rsvpButton"
     )
     BottomAppBar(
-        containerColor = RsvpBarNavy,
+        containerColor = AppBarNavy,
         contentColor = Color.White
     ) {
         Row(
@@ -549,13 +552,13 @@ private fun EventDetailBottomBar(
             if (event.isFree) {
                 Text(
                     text = stringResource(R.string.free),
-                    color = FreeGreen,
+                    color = Color(0xFF059669),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
             } else {
                 Text(
-                    text = stringResource(R.string.price_ugx, event.price),
+                    text = event.priceInfo,
                     color = OrangeAccent,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
@@ -569,7 +572,7 @@ private fun EventDetailBottomBar(
                 .height(48.dp)
                 .padding(end = 16.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent,
+                containerColor = OrangeAccent,
                 disabledContainerColor = rsvpButtonColor,
                 contentColor = Color.White,
                 disabledContentColor = Color.White
@@ -588,24 +591,14 @@ private fun EventDetailBottomBar(
                 Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color.White)
                 Spacer(Modifier.size(8.dp))
                 Text(
-                    text = stringResource(R.string.rsvpd),
+                    text = "RSVP'd",
                     fontWeight = FontWeight.Bold
                 )
             } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.horizontalGradient(listOf(OrangeAccent, GradientPurple)),
-                            RoundedCornerShape(24.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = stringResource(R.string.rsvp_now),
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Text(
+                    text = "RSVP Now",
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }

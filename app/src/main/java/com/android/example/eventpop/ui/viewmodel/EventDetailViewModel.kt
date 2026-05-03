@@ -1,13 +1,13 @@
 package com.android.example.eventpop.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
-import com.android.example.eventpop.data.EventType
-import com.android.example.eventpop.data.model.Event
+import androidx.lifecycle.viewModelScope
+import com.android.example.eventpop.data.Event
+import com.android.example.eventpop.data.SupabaseService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-
-private val mockEvents = emptyList<Event>()
+import kotlinx.coroutines.launch
 
 class EventDetailViewModel : ViewModel() {
 
@@ -24,9 +24,10 @@ class EventDetailViewModel : ViewModel() {
     val rsvpLoading: StateFlow<Boolean> = _rsvpLoading.asStateFlow()
 
     fun loadEvent(eventId: String) {
-        _event.value = mockEvents.find { it.id == eventId }
-        _isInterested.value = _event.value?.isInterested ?: false
-        _rsvpSuccess.value = false
+        viewModelScope.launch {
+            _event.value = SupabaseService.fetchEventById(eventId)
+            _rsvpSuccess.value = false
+        }
     }
 
     fun toggleInterested() {
@@ -34,8 +35,12 @@ class EventDetailViewModel : ViewModel() {
     }
 
     fun submitRsvp() {
-        _rsvpLoading.value = true
-        _rsvpSuccess.value = true
-        _rsvpLoading.value = false
+        val currentEvent = _event.value ?: return
+        viewModelScope.launch {
+            _rsvpLoading.value = true
+            val success = SupabaseService.rsvpToEvent(currentEvent.id)
+            _rsvpSuccess.value = success
+            _rsvpLoading.value = false
+        }
     }
 }

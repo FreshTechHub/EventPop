@@ -19,7 +19,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,7 +33,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.android.example.eventpop.data.Event
 import com.android.example.eventpop.data.EventCategory
+import com.android.example.eventpop.data.SupabaseService
 import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import org.maplibre.android.MapLibre
@@ -38,16 +44,6 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.annotations.MarkerOptions
-
-// Static pins for events - in a real app these come from the Event data model lat/lng fields
-private data class EventPin(
-    val title: String,
-    val location: String,
-    val latLng: LatLng,
-    val category: EventCategory
-)
-
-private val eventPins = emptyList<EventPin>()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +54,12 @@ fun MapScreen(
     onNavFavorites: () -> Unit,
     onNavProfile: () -> Unit
 ) {
+    var eventPins by remember { mutableStateOf<List<Event>>(emptyList()) }
+
+    LaunchedEffect(Unit) {
+        eventPins = SupabaseService.fetchEvents()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -111,20 +113,22 @@ fun MapScreen(
                                     // Map is ready
                                 }
                                 
-                                val kampalaLatLng = LatLng(0.3350, 32.5900)
+                                val kampalaLatLng = LatLng(0.3476, 32.5825)
                                 val position = CameraPosition.Builder()
                                     .target(kampalaLatLng)
                                     .zoom(12.0)
                                     .build()
                                 map.cameraPosition = position
                                 
-                                eventPins.forEach { pin ->
-                                    map.addMarker(
-                                        MarkerOptions()
-                                            .position(pin.latLng)
-                                            .title(pin.title)
-                                            .snippet(pin.location)
-                                    )
+                                eventPins.forEach { event ->
+                                    if (event.latitude != null && event.longitude != null) {
+                                        map.addMarker(
+                                            MarkerOptions()
+                                                .position(LatLng(event.latitude, event.longitude))
+                                                .title(event.title)
+                                                .snippet(event.location)
+                                        )
+                                    }
                                 }
                             }
                         }
