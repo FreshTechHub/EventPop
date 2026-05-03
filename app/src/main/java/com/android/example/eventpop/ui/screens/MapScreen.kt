@@ -19,11 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,9 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.android.example.eventpop.data.Event
 import com.android.example.eventpop.data.EventCategory
-import com.android.example.eventpop.data.SupabaseService
+import com.android.example.eventpop.ui.mvc.MapUiState
 import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import org.maplibre.android.MapLibre
@@ -45,21 +40,19 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.annotations.MarkerOptions
 
+/**
+ * **View** for the map: renders [MapUiState] only; loading and pins are owned by the **Controller** ([MapViewModel]).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
+    uiState: MapUiState,
     onNavEvents: () -> Unit,
     onNavMap: () -> Unit,
     onNavDiscover: () -> Unit,
     onNavFavorites: () -> Unit,
     onNavProfile: () -> Unit
 ) {
-    var eventPins by remember { mutableStateOf<List<Event>>(emptyList()) }
-
-    LaunchedEffect(Unit) {
-        eventPins = SupabaseService.fetchEvents()
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -103,40 +96,39 @@ fun MapScreen(
                     Text("Map Preview", color = Color.White)
                 }
             } else {
-                AndroidView(
-                    modifier = Modifier.fillMaxSize(),
-                    factory = { context ->
-                        MapLibre.getInstance(context)
-                        MapView(context).apply {
-                            getMapAsync { map ->
-                                map.setStyle(Style.Builder().fromUri("https://tiles.openfreemap.org/styles/liberty")) { style ->
-                                    // Map is ready
-                                }
-                                
-                                val kampalaLatLng = LatLng(0.3476, 32.5825)
-                                val position = CameraPosition.Builder()
-                                    .target(kampalaLatLng)
-                                    .zoom(12.0)
-                                    .build()
-                                map.cameraPosition = position
-                                
-                                eventPins.forEach { event ->
-                                    if (event.latitude != null && event.longitude != null) {
-                                        map.addMarker(
-                                            MarkerOptions()
-                                                .position(LatLng(event.latitude, event.longitude))
-                                                .title(event.title)
-                                                .snippet(event.location)
-                                        )
+                key(uiState.eventPins.joinToString { "${it.id}:${it.latitude}:${it.longitude}" }) {
+                    AndroidView(
+                        modifier = Modifier.fillMaxSize(),
+                        factory = { context ->
+                            MapLibre.getInstance(context)
+                            MapView(context).apply {
+                                getMapAsync { map ->
+                                    map.setStyle(Style.Builder().fromUri("https://tiles.openfreemap.org/styles/liberty")) { }
+
+                                    val kampalaLatLng = LatLng(0.3476, 32.5825)
+                                    val position = CameraPosition.Builder()
+                                        .target(kampalaLatLng)
+                                        .zoom(12.0)
+                                        .build()
+                                    map.cameraPosition = position
+
+                                    uiState.eventPins.forEach { event ->
+                                        if (event.latitude != null && event.longitude != null) {
+                                            map.addMarker(
+                                                MarkerOptions()
+                                                    .position(LatLng(event.latitude, event.longitude))
+                                                    .title(event.title)
+                                                    .snippet(event.location)
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                )
+                    )
+                }
             }
 
-            // Legend overlay
             Card(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -155,11 +147,11 @@ fun MapScreen(
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 12.sp
                     )
-                    LegendRow(color = Color(0xFF0D9488), label = "Music")
-                    LegendRow(color = Color(0xFFEA580C), label = "Food")
-                    LegendRow(color = Color(0xFF7C3AED), label = "Comedy")
-                    LegendRow(color = Color(0xFF059669), label = "Wellness")
-                    LegendRow(color = Color(0xFFDC2626), label = "Art")
+                    LegendRow(color = Color(EventCategory.MUSIC.markerColorHex.toInt()), label = "Music")
+                    LegendRow(color = Color(EventCategory.FOOD.markerColorHex.toInt()), label = "Food")
+                    LegendRow(color = Color(EventCategory.COMEDY.markerColorHex.toInt()), label = "Comedy")
+                    LegendRow(color = Color(EventCategory.WELLNESS.markerColorHex.toInt()), label = "Wellness")
+                    LegendRow(color = Color(EventCategory.ART.markerColorHex.toInt()), label = "Art")
                 }
             }
         }

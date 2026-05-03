@@ -34,7 +34,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,7 +46,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.android.example.eventpop.R
@@ -67,7 +65,7 @@ import com.android.example.eventpop.ui.theme.StarFilled
 import com.android.example.eventpop.ui.theme.StarUnfilled
 import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.SubtitleGray
-import com.android.example.eventpop.ui.viewmodel.HomeViewModel
+import com.android.example.eventpop.ui.mvc.HomeUiState
 
 
 private val EventThumbnailHeight = 80.dp
@@ -101,7 +99,7 @@ private fun EventFilter.applyTo(events: List<Event>): List<Event> {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    viewModel: HomeViewModel = viewModel(),
+    uiState: HomeUiState,
     onFilterClick: (() -> Unit)? = null,
     currentFilter: EventFilter? = null,
     onSeeAllHotEvents: () -> Unit = {},
@@ -119,10 +117,8 @@ fun HomeScreen(
     selectedFavorites: Boolean = false,
     selectedProfile: Boolean = false
 ) {
-    val events by viewModel.events.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    
-    val displayedEvents = if (currentFilter != null) currentFilter.applyTo(events) else events
+    val displayedEvents =
+        if (currentFilter != null) currentFilter.applyTo(uiState.events) else uiState.events
     Scaffold(
         topBar = {
             TopAppBar(
@@ -191,7 +187,7 @@ fun HomeScreen(
                 }
             }
             
-            if (isLoading) {
+            if (uiState.isLoading) {
                 item {
                     Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = OrangeAccent)

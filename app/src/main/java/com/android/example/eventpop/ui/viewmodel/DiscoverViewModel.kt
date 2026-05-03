@@ -3,41 +3,81 @@ package com.android.example.eventpop.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.example.eventpop.data.Event
-import com.android.example.eventpop.data.SupabaseService
+import com.android.example.eventpop.data.EventRepository
+import com.android.example.eventpop.ui.mvc.DiscoverUiState
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class DiscoverViewModel : ViewModel() {
+/**
+ * **Controller** for discover/search: coordinates [EventRepository] and search query state.
+ */
+class DiscoverViewModel(
+    private val eventRepository: EventRepository
+) : ViewModel() {
 
-    private val _events = MutableStateFlow<List<Event>>(emptyList())
-    val events: StateFlow<List<Event>> = _events.asStateFlow()
+    private val searchQuery = MutableStateFlow("")
+    private val remoteSearchOverride = MutableStateFlow<List<Event>?>(null)
+    private val isBusy = MutableStateFlow(false)
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    val uiState: StateFlow<DiscoverUiState> = combine(
+        eventRepository.observeEvents(),
+        searchQuery,
+        remoteSearchOverride,
+        isBusy
+    ) { cached, query, remote, busy ->
+        DiscoverUiState(
+            searchQuery = query,
+            events = if (query.isBlank()) cached else (remote ?: cached),
+            isLoading = busy
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = DiscoverUiState()
+    )
 
     init {
-        loadEvents()
-    }
-
-    fun loadEvents() {
         viewModelScope.launch {
-            _isLoading.value = true
-            _events.value = SupabaseService.fetchEvents()
-            _isLoading.value = false
+            isBusy.value = true
+            try {
+                eventRepository.refreshEvents()
+            } finally {
+                isBusy.value = false
+            }
+        }
+        viewModelScope.launch {
+            searchQuery.collectLatest { q ->
+                isBusy.value = true
+                try {
+                    if (q.isBlank()) {
+                        remoteSearchOverride.value = null
+                    } else {
+                        remoteSearchOverride.value = eventRepository.searchEventsRemote(q)
+                    }
+                } finally {
+                    isBusy.value = false
+                }
+            }
         }
     }
 
-    fun searchEvents(query: String) {
-        if (query.isBlank()) {
-            loadEvents()
-            return
-        }
+    fun setSearchQuery(query: String) {
+        searchQuery.value = query
+    }
+
+    fun refresh() {
         viewModelScope.launch {
-            _isLoading.value = true
-            _events.value = SupabaseService.searchEvents(query)
-            _isLoading.value = false
+            isBusy.value = true
+            try {
+                eventRepository.refreshEvents()
+            } finally {
+                isBusy.value = false
+            }
         }
     }
 }

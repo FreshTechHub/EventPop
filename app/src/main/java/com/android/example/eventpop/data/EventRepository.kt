@@ -22,8 +22,7 @@ class EventRepository(
         }
 
     suspend fun refreshEvents(): Boolean {
-        val remote = SupabaseService.fetchEventsRemote()
-        if (remote.isEmpty()) return false
+        val remote = SupabaseService.fetchEventsRemote() ?: return false
         val now = System.currentTimeMillis()
         val entities = remote.map { e ->
             EventEntity(id = e.id, payloadJson = EventJson.encode(e), updatedAtMillis = now)
@@ -31,6 +30,9 @@ class EventRepository(
         eventDao.replaceAll(entities)
         return true
     }
+
+    suspend fun rsvpToEvent(eventId: String): Boolean =
+        SupabaseService.rsvpToEvent(eventId)
 
     suspend fun refreshEvent(id: String): Boolean {
         val remote = SupabaseService.fetchEventByIdRemote(id) ?: return false

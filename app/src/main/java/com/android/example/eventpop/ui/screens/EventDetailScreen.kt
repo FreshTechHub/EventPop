@@ -53,7 +53,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -83,9 +82,8 @@ import com.android.example.eventpop.ui.theme.HeartRed
 import com.android.example.eventpop.ui.theme.RsvpBarNavy
 import com.android.example.eventpop.ui.theme.RsvpSuccessGreen
 import com.android.example.eventpop.ui.theme.GradientPurple
-import com.android.example.eventpop.ui.viewmodel.EventDetailViewModel
+import com.android.example.eventpop.ui.mvc.EventDetailUiState
 import androidx.navigation.NavController
-import androidx.navigation.NavBackStackEntry
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.delay
@@ -102,14 +100,15 @@ private val HeroScrim = Brush.verticalGradient(
 @Composable
 fun EventDetailScreen(
     navController: NavController,
-    viewModel: EventDetailViewModel,
-    navBackStackEntry: NavBackStackEntry
+    uiState: EventDetailUiState,
+    onToggleInterested: () -> Unit,
+    onSubmitRsvp: () -> Unit,
+    onConsumeRsvpSuccess: () -> Unit
 ) {
-    val eventId = navBackStackEntry.arguments?.getString("eventId")
-    val event by viewModel.event.collectAsState()
-    val isInterested by viewModel.isInterested.collectAsState()
-    val rsvpSuccess by viewModel.rsvpSuccess.collectAsState()
-    val rsvpLoading by viewModel.rsvpLoading.collectAsState()
+    val event = uiState.event
+    val isInterested = uiState.isInterested
+    val rsvpSuccess = uiState.rsvpSuccess
+    val rsvpLoading = uiState.rsvpLoading
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
@@ -119,16 +118,13 @@ fun EventDetailScreen(
         label = "heart"
     )
 
-    LaunchedEffect(eventId) {
-        viewModel.loadEvent(eventId ?: "")
-    }
-
     LaunchedEffect(rsvpSuccess) {
         if (rsvpSuccess) {
             snackbarHostState.showSnackbar(
                 message = context.getString(R.string.rsvp_success_message),
                 withDismissAction = true
             )
+            onConsumeRsvpSuccess()
         }
     }
 
@@ -148,7 +144,7 @@ fun EventDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.toggleInterested() }) {
+                    IconButton(onClick = onToggleInterested) {
                         Icon(
                             imageVector = if (isInterested) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                             contentDescription = stringResource(R.string.content_desc_favorite),
@@ -178,7 +174,7 @@ fun EventDetailScreen(
                     event = ev,
                     rsvpSuccess = rsvpSuccess,
                     rsvpLoading = rsvpLoading,
-                    onRsvpClick = { viewModel.submitRsvp() }
+                    onRsvpClick = onSubmitRsvp
                 )
             }
         }

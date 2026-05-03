@@ -49,15 +49,12 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import com.android.example.eventpop.data.Event
-import com.android.example.eventpop.ui.viewmodel.DiscoverViewModel
 import com.android.example.eventpop.ui.navigation.EventPopBottomBar
+import com.android.example.eventpop.ui.mvc.DiscoverUiState
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.SubtitleGray
 import com.android.example.eventpop.ui.theme.OrangeAccent
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -104,22 +101,18 @@ fun DiscoverScreen(
     onNavFavorites: () -> Unit,
     onNavProfile: () -> Unit,
     onEventClick: (com.android.example.eventpop.data.Event) -> Unit = {},
-    viewModel: DiscoverViewModel = viewModel()
+    uiState: DiscoverUiState,
+    onSearchQueryChange: (String) -> Unit,
+    onRefresh: () -> Unit
 ) {
-    var query by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var selectedDateLabel by remember { mutableStateOf<String?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showCategorySheet by remember { mutableStateOf(false) }
 
     val datePickerState = rememberDatePickerState()
-    val events by viewModel.events.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-
-    // Trigger search when query changes
-    LaunchedEffect(query) {
-        viewModel.searchEvents(query)
-    }
+    val events = uiState.events
+    val isLoading = uiState.isLoading
 
     if (showDatePicker) {
         DatePickerDialog(
@@ -181,11 +174,8 @@ fun DiscoverScreen(
             // Search bar
             item {
                 OutlinedTextField(
-                    value = query,
-                    onValueChange = { 
-                        query = it
-                        viewModel.searchEvents(it)
-                    },
+                    value = uiState.searchQuery,
+                    onValueChange = onSearchQueryChange,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -198,10 +188,10 @@ fun DiscoverScreen(
                         )
                     },
                     trailingIcon = {
-                        if (query.isNotEmpty()) {
-                            IconButton(onClick = { 
-                                query = "" 
-                                viewModel.loadEvents()
+                        if (uiState.searchQuery.isNotEmpty()) {
+                            IconButton(onClick = {
+                                onSearchQueryChange("")
+                                onRefresh()
                             }) {
                                 Icon(
                                     imageVector = Icons.Filled.Close,
@@ -366,7 +356,7 @@ fun DiscoverScreen(
             }
 
             // Show search results when query is active
-            if (query.isNotEmpty() || selectedCategory != null || selectedDateLabel != null) {
+            if (uiState.searchQuery.isNotEmpty() || selectedCategory != null || selectedDateLabel != null) {
                 item {
                     SectionHeader(
                         icon = Icons.Filled.Search,
@@ -394,7 +384,7 @@ fun DiscoverScreen(
                 item {
                     FlowRowBlock {
                         popularSearches.forEach { term ->
-                            PopularSearchChip(label = term, onClick = { query = term })
+                            PopularSearchChip(label = term, onClick = { onSearchQueryChange(term) })
                         }
                     }
                 }
@@ -423,9 +413,10 @@ fun DiscoverScreen(
                                             onClick = {
                                                 selectedCategory = if (selectedCategory == cat.label) null else cat.label
                                                 if (selectedCategory != null) {
-                                                    viewModel.searchEvents(selectedCategory!!)
+                                                    onSearchQueryChange(selectedCategory!!)
                                                 } else {
-                                                    viewModel.loadEvents()
+                                                    onSearchQueryChange("")
+                                                    onRefresh()
                                                 }
                                             }
                                         )

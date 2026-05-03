@@ -98,7 +98,7 @@ object SupabaseService {
             val request = pg["events"].select(columns = columns) {
                 filter?.let { filter(it) }
             }
-            request.decodeList()
+            request.decodeList<EventRemoteRow>()
         } catch (e: Exception) {
             Log.w("SupabaseService", "events select failed for columns=$columns: ${e.message}")
             if (columns != Columns.ALL) {
@@ -115,7 +115,7 @@ object SupabaseService {
     suspend fun fetchEventsRemote(): List<Event>? = withContext(Dispatchers.IO) {
         try {
             val rows = loadEventRows(eventsSelectColumns)
-            if (rows.isEmpty() && postgrest == null) return@withContext null
+            if (postgrest == null) return@withContext null
             rows.map { it.toEvent().withResolvedStorageImage(StorageBuckets.EVENT_IMAGES) }
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error fetching events", e)
@@ -128,10 +128,10 @@ object SupabaseService {
         try {
             val row = pg["events"].select(columns = eventsSelectColumns) {
                 filter { eq("id", eventId) }
-            }.decodeSingleOrNull<EventRemoteRow>()
+            }.decodeList<EventRemoteRow>().singleOrNull()
                 ?: pg["events"].select(columns = Columns.ALL) {
                     filter { eq("id", eventId) }
-                }.decodeSingleOrNull<EventRemoteRow>()
+                }.decodeList<EventRemoteRow>().singleOrNull()
                 ?: return@withContext null
             row.toEvent().withResolvedStorageImage(StorageBuckets.EVENT_IMAGES)
         } catch (e: Exception) {
