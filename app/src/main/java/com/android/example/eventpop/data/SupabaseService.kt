@@ -1,17 +1,18 @@
 package com.android.example.eventpop.data
 
 import android.util.Log
+import com.android.example.eventpop.data.remote.EventRemoteRow
+import com.android.example.eventpop.data.remote.toEvent
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.handleDeeplinks
+import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.storage.storage
-import io.github.jan.supabase.auth.providers.builtin.Email
-import com.android.example.eventpop.data.Event
-import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -19,9 +20,13 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * Service for interacting with Supabase.
+ * Service for interacting with Supabase (PostgREST + Storage + Auth).
  */
 object SupabaseService {
+
+    private val eventsSelectColumns = Columns.raw(
+        "*,area:areas(name),category:categories(name)"
+    )
 
     private val client = if (AppConfig.isSupabaseConfigured) {
         createSupabaseClient(
@@ -43,23 +48,16 @@ object SupabaseService {
     val postgrest get() = client?.postgrest
     val storage get() = client?.storage
 
-    /**
-     * Handle deep links for authentication.
-     */
     fun handleDeeplinks(intent: android.content.Intent) {
         client?.handleDeeplinks(intent)
     }
 
-    /**
-     * Sign up a new user with email and password.
-     */
     suspend fun signUp(email: String, name: String) {
         val auth = auth ?: return
         try {
             auth.signUpWith(Email) {
                 this.email = email
                 this.password = "TemporaryPassword123!"
-                // this.redirectTo = "eventpop://login"
                 data = buildJsonObject {
                     put("full_name", name)
                 }
@@ -70,9 +68,6 @@ object SupabaseService {
         }
     }
 
-    /**
-     * Sign in a user with email and password.
-     */
     suspend fun signIn(email: String) {
         val auth = auth ?: return
         try {
@@ -86,76 +81,136 @@ object SupabaseService {
         }
     }
 
-    /**
-     * Check if a user is currently logged in.
-     */
     fun isUserLoggedIn(): Boolean {
         return auth?.currentSessionOrNull() != null
     }
 
-    /**
-     * Sign out the current user.
-     */
     suspend fun signOut() {
         auth?.signOut()
     }
 
+    private suspend fun loadEventRows(
+        columns: Columns,
+        filter: (io.github.jan.supabase.postgrest.query.filter.PostgrestFilterBuilder.() -> Unit)? = null
+    ): List<EventRemoteRow> {
+        val pg = postgrest ?: return emptyList()
+        return try {
+            val request = pg["events"].select(columns = columns) {
+                filter?.let { filter(it) }
+            }
+            request.decodeList()
+        } catch (e: Exception) {
+            Log.w("SupabaseService", "events select failed for columns=$columns: ${e.message}")
+            if (columns != Columns.ALL) {
+                loadEventRows(Columns.ALL, filter)
+            } else {
+                emptyList()
+            }
+        }
+    }
+
     /**
-     * Fetch events from Supabase.
+     * Loads events from the network. Returns null on transport/parse failure (local cache should be kept).
      */
-    suspend fun fetchEvents(): List<Event> = withContext(Dispatchers.IO) {
-        val pg = postgrest ?: return@withContext emptyList()
+    suspend fun fetchEventsRemote(): List<Event>? = withContext(Dispatchers.IO) {
         try {
-            val results = pg["events"].select(columns = Columns.ALL).decodeList<Event>()
-            return@withContext results
+            val rows = loadEventRows(eventsSelectColumns)
+            if (rows.isEmpty() && postgrest == null) return@withContext null
+            rows.map { it.toEvent().withResolvedStorageImage(StorageBuckets.EVENT_IMAGES) }
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error fetching events", e)
-            return@withContext emptyList()
+            null
         }
     }
 
-    suspend fun fetchEventById(eventId: String): Event? = withContext(Dispatchers.IO) {
+    suspend fun fetchEventByIdRemote(eventId: String): Event? = withContext(Dispatchers.IO) {
         val pg = postgrest ?: return@withContext null
         try {
-            val result = pg["events"].select(columns = Columns.ALL) {
-                filter {
-                    eq("id", eventId)
-                }
-            }.decodeSingle<Event>()
-            return@withContext result
+            val row = pg["events"].select(columns = eventsSelectColumns) {
+                filter { eq("id", eventId) }
+            }.decodeSingleOrNull<EventRemoteRow>()
+                ?: pg["events"].select(columns = Columns.ALL) {
+                    filter { eq("id", eventId) }
+                }.decodeSingleOrNull<EventRemoteRow>()
+                ?: return@withContext null
+            row.toEvent().withResolvedStorageImage(StorageBuckets.EVENT_IMAGES)
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error fetching event by id", e)
-            return@withContext null
+            null
         }
     }
 
-    /**
-     * Search events by title or description.
-     */
-    suspend fun searchEvents(query: String): List<Event> = withContext(Dispatchers.IO) {
+    suspend fun searchEventsRemote(query: String): List<Event> = withContext(Dispatchers.IO) {
         val pg = postgrest ?: return@withContext emptyList()
         try {
-            val results = pg["events"].select {
+            val rows = pg["events"].select(columns = eventsSelectColumns) {
                 filter {
                     or {
                         ilike("title", "%$query%")
                         ilike("description", "%$query%")
                     }
                 }
-            }.decodeList<Event>()
-            return@withContext results
+            }.decodeList<EventRemoteRow>()
+            rows.map { it.toEvent().withResolvedStorageImage(StorageBuckets.EVENT_IMAGES) }
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error searching events", e)
-            return@withContext emptyList()
+            try {
+                val rows = pg["events"].select(columns = Columns.ALL) {
+                    filter {
+                        or {
+                            ilike("title", "%$query%")
+                            ilike("description", "%$query%")
+                        }
+                    }
+                }.decodeList<EventRemoteRow>()
+                rows.map { it.toEvent().withResolvedStorageImage(StorageBuckets.EVENT_IMAGES) }
+            } catch (e2: Exception) {
+                Log.e("SupabaseService", "Error searching events (fallback)", e2)
+                emptyList()
+            }
         }
     }
 
     /**
-     * Placeholder for RSVP functionality.
+     * Public URL for an object in a **public** Supabase Storage bucket.
      */
+    fun publicStorageUrl(bucketId: String, objectPath: String): String? {
+        val c = client ?: return null
+        return try {
+            c.storage.from(bucketId).publicUrl(objectPath.trimStart('/'))
+        } catch (e: Exception) {
+            Log.e("SupabaseService", "publicUrl error: ${e.message}", e)
+            null
+        }
+    }
+
+    /**
+     * Upload bytes to Storage and return the public URL (bucket must allow public read).
+     */
+    suspend fun uploadPublicObject(
+        bucketId: String,
+        objectPath: String,
+        bytes: ByteArray,
+        contentType: String = "application/octet-stream"
+    ): Result<String> = withContext(Dispatchers.IO) {
+        val s = storage ?: return@withContext Result.failure(IllegalStateException("Supabase not configured"))
+        runCatching {
+            s.from(bucketId).upload(objectPath.trimStart('/'), bytes) {
+                upsert = true
+                this.contentType = contentType
+            }
+            s.from(bucketId).publicUrl(objectPath.trimStart('/'))
+        }
+    }
+
+    private fun Event.withResolvedStorageImage(bucketId: String): Event {
+        val url = imageUrl ?: return this
+        if (url.startsWith("http", ignoreCase = true)) return this
+        val resolved = publicStorageUrl(bucketId, url) ?: return this
+        return copy(imageUrl = resolved)
+    }
+
     suspend fun rsvpToEvent(eventId: String): Boolean = withContext(Dispatchers.IO) {
-        // In a production app, this would be a database insert or update
-        // We'll simulate a successful RSVP for now
         delay(500)
         true
     }

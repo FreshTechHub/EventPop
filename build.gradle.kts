@@ -4,6 +4,7 @@ import java.io.File
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.google.ksp) apply false
 }
 
 /** Load KEY=value pairs from `.env` at the repo root (comments and blank lines ignored). */
