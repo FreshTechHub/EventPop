@@ -113,7 +113,11 @@
     <string name="create_event_field_location">Venue or address</string>
     <string name="create_event_field_description">Description</string>
     <string name="create_event_field_area">Area</string>
+    <string name="create_event_area_placeholder_no_list">Optional — no areas yet</string>
+    <string name="create_event_area_list_empty">No areas are listed yet. You can still publish this event. After new areas are added for your project, reopen this screen to link one.</string>
     <string name="create_event_field_category">Category</string>
+    <string name="create_event_category_placeholder_no_list">Optional — no categories yet</string>
+    <string name="create_event_category_list_empty">No categories are listed yet. You can still publish. After categories exist, reopen this screen to pick one.</string>
     <string name="create_event_free_entry">Free entry</string>
     <string name="create_event_free_hint">Turn off to sell tickets (UGX).</string>
     <string name="create_event_field_price">Ticket price (UGX)</string>
@@ -155,10 +159,6 @@
     <string name="auth_footer_sign_up">Sign Up</string>
     <string name="auth_footer_has_account">Already have an account? </string>
     <string name="auth_footer_log_in">Log In</string>
-    <string name="auth_or_continue_with">or continue with</string>
-    <string name="auth_continue_google">Continue with Google</string>
-    <string name="auth_continue_apple">Continue with Apple</string>
-    <string name="auth_social_coming_soon">Coming soon</string>
     <string name="auth_terms_prefix">I agree to </string>
     <string name="auth_terms_service">Terms of Service</string>
     <string name="auth_terms_and"> and </string>

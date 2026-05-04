@@ -19,7 +19,6 @@ object AuthUiTokens {
     val RadiusButton = 8.dp
     val HeaderHeight = 220.dp
     val CtaHeight = 52.dp
-    val SocialHeight = 48.dp
     val ElevationCard = 2.dp
 
     val PasswordStrengthColors = listOf(

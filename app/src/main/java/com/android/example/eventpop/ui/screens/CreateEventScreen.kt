@@ -464,13 +464,20 @@ private fun CreateEventFormContent(
         }
     }
 
-    val areaLabel = uiState.areas.find { it.id == uiState.selectedAreaId }?.name.orEmpty()
-    val categoryLabel = uiState.categories.find { it.id == uiState.selectedCategoryId }?.name.orEmpty()
+    val areaLabel = when {
+        uiState.areas.isEmpty() -> stringResource(R.string.create_event_area_placeholder_no_list)
+        else -> uiState.areas.find { it.id == uiState.selectedAreaId }?.name.orEmpty()
+    }
+    val categoryLabel = when {
+        uiState.categories.isEmpty() -> stringResource(R.string.create_event_category_placeholder_no_list)
+        else -> uiState.categories.find { it.id == uiState.selectedCategoryId }?.name.orEmpty()
+    }
 
     if (showAreaPicker) {
         SelectionListDialog(
             title = stringResource(R.string.create_event_field_area),
             options = uiState.areas,
+            emptyListMessage = stringResource(R.string.create_event_area_list_empty).takeIf { uiState.areas.isEmpty() },
             onDismiss = { showAreaPicker = false },
             onPick = { row ->
                 onAreaId(row.id)
@@ -482,6 +489,9 @@ private fun CreateEventFormContent(
         SelectionListDialog(
             title = stringResource(R.string.create_event_field_category),
             options = uiState.categories,
+            emptyListMessage = stringResource(R.string.create_event_category_list_empty).takeIf {
+                uiState.categories.isEmpty()
+            },
             onDismiss = { showCategoryPicker = false },
             onPick = { row ->
                 onCategoryId(row.id)
@@ -933,6 +943,7 @@ private fun PickerOutlineField(
 private fun SelectionListDialog(
     title: String,
     options: List<NamedLookupRow>,
+    emptyListMessage: String? = null,
     onDismiss: () -> Unit,
     onPick: (NamedLookupRow) -> Unit
 ) {
@@ -951,20 +962,33 @@ private fun SelectionListDialog(
                     modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp)
                 )
                 HorizontalDivider(color = Color(0xFFE8E8E8))
-                LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
-                    items(options, key = { it.id }) { row ->
-                        Text(
-                            text = row.name,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = AppBarNavy,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    onPick(row)
-                                }
-                                .padding(horizontal = 22.dp, vertical = 16.dp)
-                        )
-                        HorizontalDivider(color = Color(0xFFF0F0F0))
+                if (options.isEmpty()) {
+                    Text(
+                        text = emptyListMessage.orEmpty(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = SubtitleGray,
+                        lineHeight = 22.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 120.dp, max = 360.dp)
+                            .padding(horizontal = 22.dp, vertical = 20.dp)
+                    )
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                        items(options, key = { it.id }) { row ->
+                            Text(
+                                text = row.name,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = AppBarNavy,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        onPick(row)
+                                    }
+                                    .padding(horizontal = 22.dp, vertical = 16.dp)
+                            )
+                            HorizontalDivider(color = Color(0xFFF0F0F0))
+                        }
                     }
                 }
                 TextButton(

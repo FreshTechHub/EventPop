@@ -132,7 +132,10 @@ class SignUpViewModel : ViewModel() {
                 val msg = result.exceptionOrNull()?.message.orEmpty()
                 val text = when {
                     msg.contains("no user id", ignoreCase = true) ||
-                        msg.contains("confirmation", ignoreCase = true) ->
+                        msg.contains("confirmation", ignoreCase = true) ||
+                        msg.contains("not confirmed", ignoreCase = true) ||
+                        msg.contains("email_not_confirmed", ignoreCase = true) ||
+                        msg.contains("email not confirmed", ignoreCase = true) ->
                         UiText.Resource(R.string.auth_sign_up_check_email)
 
                     msg.contains("already registered", ignoreCase = true) ||

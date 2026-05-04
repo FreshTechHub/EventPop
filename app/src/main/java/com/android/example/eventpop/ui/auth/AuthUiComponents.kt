@@ -2,7 +2,6 @@
 
 package com.android.example.eventpop.ui.auth
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -25,11 +24,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -202,59 +199,6 @@ fun AuthPrimaryCta(
                 fontSize = 16.sp
             )
         }
-    }
-}
-
-@Composable
-fun AuthSocialOutlinedButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    leading: @Composable () -> Unit
-) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .height(AuthUiTokens.SocialHeight),
-        shape = RoundedCornerShape(AuthUiTokens.RadiusButton),
-        border = BorderStroke(1.dp, AuthUiTokens.BorderDefault),
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = AuthUiTokens.Surface,
-            contentColor = AuthUiTokens.TextPrimary
-        )
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            leading()
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(text = text, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        }
-    }
-}
-
-@Composable
-fun AuthOrDivider() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        HorizontalDivider(
-            modifier = Modifier.weight(1f),
-            color = AuthUiTokens.BorderDefault
-        )
-        Text(
-            text = stringResource(R.string.auth_or_continue_with),
-            modifier = Modifier.padding(horizontal = 12.dp),
-            color = AuthUiTokens.TextSecondary,
-            fontSize = 13.sp
-        )
-        HorizontalDivider(
-            modifier = Modifier.weight(1f),
-            color = AuthUiTokens.BorderDefault
-        )
     }
 }
 

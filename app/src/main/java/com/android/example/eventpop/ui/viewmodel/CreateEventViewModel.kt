@@ -117,11 +117,7 @@ class CreateEventViewModel(
             _uiState.update {
                 it.copy(
                     isLoadingMeta = false,
-                    metaError = when {
-                        areas.isEmpty() -> "No areas found in the project. Seed `public.areas` in Supabase."
-                        categories.isEmpty() -> "No categories found. Seed `public.categories` in Supabase."
-                        else -> null
-                    },
+                    metaError = null,
                     areas = areas,
                     categories = categories,
                     hostedCount = quota.hostedEventCount,
@@ -275,8 +271,12 @@ class CreateEventViewModel(
             title = if (title.length < 3) "Enter a title (at least 3 characters)." else null,
             location = if (state.locationData == null) "Please select a location for this event" else null,
             description = if (description.length < 10) "Add a short description (at least 10 characters)." else null,
-            area = if (areaId.isNullOrBlank()) "Choose an area." else null,
-            category = if (categoryId.isNullOrBlank()) "Choose a category." else null,
+            area = if (state.areas.isNotEmpty() && areaId.isNullOrBlank()) "Choose an area." else null,
+            category = if (state.categories.isNotEmpty() && categoryId.isNullOrBlank()) {
+                "Choose a category."
+            } else {
+                null
+            },
             date = if (state.dateText.isNotBlank() && !isoDateLooksOk(state.dateText)) {
                 "Use ISO date YYYY-MM-DD or leave blank."
             } else {
@@ -323,8 +323,8 @@ class CreateEventViewModel(
                 date = state.dateText.trim().takeIf { it.isNotEmpty() },
                 startTime = normalizeTime(state.startTimeText.trim().takeIf { it.isNotEmpty() }),
                 endTime = normalizeTime(state.endTimeText.trim().takeIf { it.isNotEmpty() }),
-                areaId = areaId!!,
-                categoryId = categoryId!!,
+                areaId = areaId?.takeIf { it.isNotBlank() },
+                categoryId = categoryId?.takeIf { it.isNotBlank() },
                 latitude = loc.latitude,
                 longitude = loc.longitude,
                 imagePathOrUrl = state.coverStoragePath

@@ -147,20 +147,37 @@ object SupabaseService {
         val a = auth ?: return@withContext Result.failure(
             IllegalStateException("Supabase not configured")
         )
+        val trimmedEmail = email.trim()
         runCatching {
             a.signUpWith(Email) {
-                this.email = email.trim()
+                this.email = trimmedEmail
                 this.password = password
                 data = buildJsonObject {
                     put("full_name", fullName.trim())
                 }
             }
+            // GoTrue may create the user before the local session is visible; the app treats
+            // `currentSessionOrNull()` as "logged in". Wait briefly, then sign in with the same
+            // credentials when auto-confirm is on so PostgREST calls and the main app see a session.
+            var session = a.currentSessionOrNull()
+            if (session == null) {
+                repeat(8) {
+                    delay(40)
+                    session = a.currentSessionOrNull()
+                    if (session != null) return@repeat
+                }
+            }
+            if (session == null) {
+                a.signInWith(Email) {
+                    this.email = trimmedEmail
+                    this.password = password
+                }
+            }
             val user = a.currentUserOrNull()
-            val id = user?.id
-                ?: return@withContext Result.failure(
-                    IllegalStateException("Sign up succeeded but no user id (check email confirmation settings).")
+                ?: throw IllegalStateException(
+                    "Sign up succeeded but no user id (check email confirmation settings)."
                 )
-            SignUpIdentity(userId = id, email = user.email ?: email.trim())
+            SignUpIdentity(userId = user.id, email = user.email ?: trimmedEmail)
         }.fold(
             onSuccess = { Result.success(it) },
             onFailure = { Result.failure(it) }
@@ -245,8 +262,8 @@ object SupabaseService {
         val date: String? = null,
         @SerialName("start_time") val startTime: String? = null,
         @SerialName("end_time") val endTime: String? = null,
-        @SerialName("area_id") val areaId: String,
-        @SerialName("category_id") val categoryId: String,
+        @SerialName("area_id") val areaId: String? = null,
+        @SerialName("category_id") val categoryId: String? = null,
         val latitude: Double? = null,
         val longitude: Double? = null
     )

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,13 +24,10 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.PhoneIphone
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -40,12 +36,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -56,7 +50,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.example.eventpop.R
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,12 +60,9 @@ fun SignUpScreen(
     onAuthenticated: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
     val termsUrl = stringResource(R.string.auth_terms_url)
     val privacyUrl = stringResource(R.string.auth_privacy_url)
-    val socialSoon = stringResource(R.string.auth_social_coming_soon)
 
     LaunchedEffect(uiState) {
         if (uiState is SignUpUiState.Success) {
@@ -89,8 +79,7 @@ fun SignUpScreen(
     val loading = uiState is SignUpUiState.Loading
 
     Scaffold(
-        containerColor = AuthUiTokens.Background,
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        containerColor = AuthUiTokens.Background
     ) { padding ->
         Column(
             modifier = Modifier
@@ -305,50 +294,6 @@ fun SignUpScreen(
                             onClick = { viewModel.submit() },
                             loading = loading,
                             enabled = idle != null
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        AuthOrDivider()
-
-                        AuthSocialOutlinedButton(
-                            text = stringResource(R.string.auth_continue_google),
-                            onClick = {
-                                scope.launch { snackbarHostState.showSnackbar(socialSoon) }
-                            },
-                            leading = {
-                                Box(
-                                    modifier = Modifier
-                                        .size(22.dp)
-                                        .background(
-                                            color = Color(0xFF4285F4),
-                                            shape = CircleShape
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "G",
-                                        color = AuthUiTokens.Surface,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                            }
-                        )
-
-                        AuthSocialOutlinedButton(
-                            text = stringResource(R.string.auth_continue_apple),
-                            onClick = {
-                                scope.launch { snackbarHostState.showSnackbar(socialSoon) }
-                            },
-                            leading = {
-                                Icon(
-                                    imageVector = Icons.Outlined.PhoneIphone,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(22.dp),
-                                    tint = AuthUiTokens.TextPrimary
-                                )
-                            }
                         )
                     }
                 }

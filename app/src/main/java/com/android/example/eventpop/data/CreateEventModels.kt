@@ -31,8 +31,8 @@ data class CreateEventSubmission(
     val date: String?,
     val startTime: String?,
     val endTime: String?,
-    val areaId: String,
-    val categoryId: String,
+    val areaId: String?,
+    val categoryId: String?,
     val latitude: Double?,
     val longitude: Double?,
     /** Storage object path or https URL; null if no image. */
