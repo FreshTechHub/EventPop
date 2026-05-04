@@ -31,6 +31,7 @@ fun AuthNavGraph(onAuthenticated: () -> Unit) {
             val viewModel: SignUpViewModel = viewModel()
             SignUpScreen(
                 viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() },
                 onNavigateToLogin = { navController.popBackStack() },
                 onAuthenticated = onAuthenticated
             )

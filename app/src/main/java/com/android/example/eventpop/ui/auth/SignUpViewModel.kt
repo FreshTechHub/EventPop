@@ -18,10 +18,12 @@ sealed class SignUpUiState {
         val email: String = "",
         val password: String = "",
         val confirmPassword: String = "",
+        val termsAccepted: Boolean = false,
         val fullNameError: UiText? = null,
         val emailError: UiText? = null,
         val passwordError: UiText? = null,
         val confirmPasswordError: UiText? = null,
+        val termsError: UiText? = null,
         val bannerError: UiText? = null
     ) : SignUpUiState()
 
@@ -53,7 +55,12 @@ class SignUpViewModel : ViewModel() {
     fun onPasswordChange(value: String) {
         _uiState.update { s ->
             if (s !is SignUpUiState.Idle) s
-            else s.copy(password = value, passwordError = null, confirmPasswordError = null, bannerError = null)
+            else s.copy(
+                password = value,
+                passwordError = null,
+                confirmPasswordError = null,
+                bannerError = null
+            )
         }
     }
 
@@ -61,6 +68,13 @@ class SignUpViewModel : ViewModel() {
         _uiState.update { s ->
             if (s !is SignUpUiState.Idle) s
             else s.copy(confirmPassword = value, confirmPasswordError = null, bannerError = null)
+        }
+    }
+
+    fun onTermsAcceptedChange(value: Boolean) {
+        _uiState.update { s ->
+            if (s !is SignUpUiState.Idle) s
+            else s.copy(termsAccepted = value, termsError = null, bannerError = null)
         }
     }
 
@@ -81,6 +95,7 @@ class SignUpViewModel : ViewModel() {
         var emailErr: UiText? = null
         var passErr: UiText? = null
         var confirmErr: UiText? = null
+        var termsErr: UiText? = null
 
         if (fullName.isEmpty()) nameErr = UiText.Resource(R.string.auth_error_name_required)
         if (email.isEmpty()) emailErr = UiText.Resource(R.string.auth_error_email_required)
@@ -91,13 +106,17 @@ class SignUpViewModel : ViewModel() {
         if (password != confirm) {
             confirmErr = UiText.Resource(R.string.auth_error_password_mismatch)
         }
+        if (!idle.termsAccepted) {
+            termsErr = UiText.Resource(R.string.auth_error_terms_required)
+        }
 
-        if (nameErr != null || emailErr != null || passErr != null || confirmErr != null) {
+        if (nameErr != null || emailErr != null || passErr != null || confirmErr != null || termsErr != null) {
             _uiState.value = idle.copy(
                 fullNameError = nameErr,
                 emailError = emailErr,
                 passwordError = passErr,
-                confirmPasswordError = confirmErr
+                confirmPasswordError = confirmErr,
+                termsError = termsErr
             )
             return
         }

@@ -64,6 +64,8 @@
     <string name="profile_create_event">Create Event</string>
 
     <!-- Auth -->
+    <string name="auth_header_login_subtitle">Discover gigs &amp; happenings in Kampala</string>
+    <string name="auth_header_signup_subtitle">Find concerts, markets &amp; nights out nearby</string>
     <string name="auth_login_subtitle">Sign in to continue</string>
     <string name="auth_sign_up_title">Create account</string>
     <string name="auth_sign_up_subtitle">Join EventPop to discover events near you</string>
@@ -73,10 +75,25 @@
     <string name="auth_confirm_password_label">Confirm password</string>
     <string name="auth_full_name_label">Full name</string>
     <string name="auth_sign_in">Sign in</string>
-    <string name="auth_create_account">Create account</string>
+    <string name="auth_log_in">Log In</string>
+    <string name="auth_create_account">Create Account</string>
     <string name="auth_forgot_password">Forgot password?</string>
     <string name="auth_go_to_sign_up">No account yet? Sign up</string>
     <string name="auth_go_to_login">Already have an account? Log in</string>
+    <string name="auth_footer_no_account">Don\'t have an account? </string>
+    <string name="auth_footer_sign_up">Sign Up</string>
+    <string name="auth_footer_has_account">Already have an account? </string>
+    <string name="auth_footer_log_in">Log In</string>
+    <string name="auth_or_continue_with">or continue with</string>
+    <string name="auth_continue_google">Continue with Google</string>
+    <string name="auth_continue_apple">Continue with Apple</string>
+    <string name="auth_social_coming_soon">Coming soon</string>
+    <string name="auth_terms_prefix">I agree to </string>
+    <string name="auth_terms_service">Terms of Service</string>
+    <string name="auth_terms_and"> and </string>
+    <string name="auth_terms_privacy">Privacy Policy</string>
+    <string name="auth_terms_url">https://example.com/terms</string>
+    <string name="auth_privacy_url">https://example.com/privacy</string>
     <string name="auth_password_show">Show password</string>
     <string name="auth_password_hide">Hide password</string>
     <string name="auth_reset_email_sent">Check your email for a reset link.</string>
@@ -95,4 +112,5 @@
     <string name="auth_error_sign_up_failed">Could not create your account. Try again.</string>
     <string name="auth_sign_up_check_email">Check your email to confirm your account, then sign in.</string>
     <string name="auth_error_email_in_use">An account with this email already exists.</string>
+    <string name="auth_error_terms_required">Please accept the Terms of Service and Privacy Policy</string>
 </resources>
