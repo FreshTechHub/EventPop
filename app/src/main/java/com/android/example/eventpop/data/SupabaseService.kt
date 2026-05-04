@@ -18,6 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import io.ktor.http.ContentType
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -106,6 +107,102 @@ object SupabaseService {
     suspend fun signOut() {
         auth?.signOut()
     }
+
+    suspend fun signInWithEmailPassword(email: String, password: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            val a = auth ?: return@withContext Result.failure(
+                IllegalStateException("Supabase not configured")
+            )
+            runCatching {
+                a.signInWith(Email) {
+                    this.email = email.trim()
+                    this.password = password
+                }
+            }.fold(
+                onSuccess = { Result.success(Unit) },
+                onFailure = { Result.failure(it) }
+            )
+        }
+
+    suspend fun signUpWithEmailPassword(
+        email: String,
+        password: String,
+        fullName: String
+    ): Result<SignUpIdentity> = withContext(Dispatchers.IO) {
+        val a = auth ?: return@withContext Result.failure(
+            IllegalStateException("Supabase not configured")
+        )
+        runCatching {
+            a.signUpWith(Email) {
+                this.email = email.trim()
+                this.password = password
+                data = buildJsonObject {
+                    put("full_name", fullName.trim())
+                }
+            }
+            val user = a.currentUserOrNull()
+            val id = user?.id
+                ?: return@withContext Result.failure(
+                    IllegalStateException("Sign up succeeded but no user id (check email confirmation settings).")
+                )
+            SignUpIdentity(userId = id, email = user.email ?: email.trim())
+        }.fold(
+            onSuccess = { Result.success(it) },
+            onFailure = { Result.failure(it) }
+        )
+    }
+
+    suspend fun sendPasswordResetEmail(email: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            val a = auth ?: return@withContext Result.failure(
+                IllegalStateException("Supabase not configured")
+            )
+            runCatching {
+                a.resetPasswordForEmail(
+                    email = email.trim(),
+                    redirectUrl = "eventpop://login"
+                )
+            }.fold(
+                onSuccess = { Result.success(Unit) },
+                onFailure = { Result.failure(it) }
+            )
+        }
+
+    @Serializable
+    private data class ProfileInsertDto(
+        val id: String,
+        val username: String,
+        @SerialName("full_name") val fullName: String
+    )
+
+    suspend fun insertProfileRow(id: String, fullName: String, username: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            val pg = postgrest ?: return@withContext Result.failure(
+                IllegalStateException("Supabase not configured")
+            )
+            runCatching {
+                pg["profiles"].insert(
+                    ProfileInsertDto(
+                        id = id,
+                        username = username,
+                        fullName = fullName
+                    )
+                )
+            }.fold(
+                onSuccess = { Result.success(Unit) },
+                onFailure = { e ->
+                    val msg = e.message.orEmpty()
+                    if (msg.contains("profiles_pkey", ignoreCase = true) ||
+                        (msg.contains("23505", ignoreCase = true) &&
+                            msg.contains("(id)", ignoreCase = true))
+                    ) {
+                        Result.success(Unit)
+                    } else {
+                        Result.failure(e)
+                    }
+                }
+            )
+        }
 
     private suspend fun loadEventRows(
         columns: Columns,
@@ -215,7 +312,7 @@ object SupabaseService {
         runCatching {
             s.from(bucketId).upload(objectPath.trimStart('/'), bytes) {
                 upsert = true
-                this.contentType = contentType
+                this.contentType = ContentType.parse(contentType)
             }
             s.from(bucketId).publicUrl(objectPath.trimStart('/'))
         }

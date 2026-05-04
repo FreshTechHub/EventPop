@@ -77,3 +77,11 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
+
+// Java plugin registers `testClasses`; Android application projects do not. Tools and run configs
+// that call `:app:testClasses` still work if we alias it to the debug unit-test compile lifecycle.
+tasks.register("testClasses") {
+    group = "verification"
+    description = "Compiles JVM unit test sources (debug). Alias for the Java plugin task name."
+    dependsOn(tasks.named("compileDebugUnitTestSources"))
+}

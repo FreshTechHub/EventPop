@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface EventDao {
 
-    @Query("SELECT * FROM cached_events ORDER BY updated_at_millis DESC")
+    @Query("SELECT * FROM cached_events ORDER BY updatedAtMillis DESC")
     fun observeAll(): Flow<List<EventEntity>>
 
     @Query("SELECT * FROM cached_events WHERE id = :id")
@@ -23,7 +23,7 @@ interface EventDao {
     suspend fun upsert(entity: EventEntity)
 
     @Query("DELETE FROM cached_events")
-    suspend fun deleteAll()
+    suspend fun deleteAll(): Int
 
     @Transaction
     suspend fun replaceAll(entities: List<EventEntity>) {

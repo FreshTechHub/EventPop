@@ -100,8 +100,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.jan.supabase.auth.handleDeeplinks
+import com.android.example.eventpop.data.AuthRepository
 import com.android.example.eventpop.data.SupabaseService
+import com.android.example.eventpop.ui.navigation.AuthNavGraph
 import androidx.compose.ui.window.Dialog
 import com.android.example.eventpop.ui.theme.EventPopTheme
 import androidx.compose.material3.CircularProgressIndicator
@@ -161,21 +162,48 @@ class LandingPageActivity : ComponentActivity() {
                     }
 
                     // Check session
-                    if (SupabaseService.isUserLoggedIn()) {
-                        startActivity(Intent(this@LandingPageActivity, MainActivity::class.java))
+                    if (AuthRepository.isLoggedIn()) {
+                        startActivity(
+                            Intent(this@LandingPageActivity, MainActivity::class.java).apply {
+                                addFlags(
+                                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                )
+                            }
+                        )
                         finish()
                     }
                     isCheckingAuth = false
                 }
 
                 if (!isCheckingAuth) {
-                    LandingPage()
+                    AuthNavGraph(
+                        onAuthenticated = {
+                            startActivity(
+                                Intent(this@LandingPageActivity, MainActivity::class.java).apply {
+                                    addFlags(
+                                        Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                    )
+                                }
+                            )
+                            finish()
+                        }
+                    )
                 } else {
                     Box(modifier = Modifier.fillMaxSize().background(LandingBackground), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = GradientOrange)
                     }
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        try {
+            SupabaseService.handleDeeplinks(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("LandingPage", "Deep link error", e)
         }
     }
 }
