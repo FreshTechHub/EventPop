@@ -1,5 +1,6 @@
 package com.android.example.eventpop.ui.mvc
 
+import com.android.example.eventpop.data.EventLocationData
 import com.android.example.eventpop.data.NamedLookupRow
 
 data class CreateEventFieldErrors(
@@ -28,15 +29,12 @@ data class CreateEventUiState(
     val selectedAreaId: String? = null,
     val selectedCategoryId: String? = null,
     val title: String = "",
-    val location: String = "",
     val description: String = "",
     val isFree: Boolean = true,
     val priceText: String = "",
     val dateText: String = "",
     val startTimeText: String = "",
     val endTimeText: String = "",
-    val latitudeText: String = "",
-    val longitudeText: String = "",
     val coverImageLabel: String? = null,
     val coverStoragePath: String? = null,
     val isUploadingCover: Boolean = false,
@@ -44,5 +42,10 @@ data class CreateEventUiState(
     val publishError: String? = null,
     val fieldErrors: CreateEventFieldErrors = CreateEventFieldErrors(),
     /** When non-null, navigate to event detail; clear after handling navigation. */
-    val navigateToEventId: String? = null
+    val navigateToEventId: String? = null,
+    /** Confirmed map-picked location for submission. */
+    val locationData: EventLocationData? = null,
+    /** Reverse geocode in progress (location picker sheet). */
+    val locationLoading: Boolean = false,
+    val locationError: String? = null
 )

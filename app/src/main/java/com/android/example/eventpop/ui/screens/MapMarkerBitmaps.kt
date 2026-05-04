@@ -16,6 +16,20 @@ import kotlin.math.min
 internal object MapMarkerBitmaps {
 
     private val cache = mutableMapOf<EventCategory, Bitmap>()
+    private var orangePickerIcon: Icon? = null
+
+    /** Orange pin with white glyph (create-event location picker). */
+    fun iconOrangePicker(context: Context): Icon {
+        orangePickerIcon?.let { return it }
+        val density = context.resources.displayMetrics.density
+        val wPx = (40f * density).toInt().coerceAtLeast(40)
+        val hPx = (48f * density).toInt().coerceAtLeast(48)
+        val orangeArgb = 0xFFFF6B00.toInt()
+        val bitmap = createMarkerBitmap(wPx, hPx, orangeArgb, density)
+        val icon = IconFactory.getInstance(context).fromBitmap(bitmap)
+        orangePickerIcon = icon
+        return icon
+    }
 
     fun iconForCategory(context: Context, category: EventCategory): Icon {
         val density = context.resources.displayMetrics.density

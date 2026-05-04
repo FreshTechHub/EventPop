@@ -213,4 +213,16 @@
     <string name="landing_get_started">Get Started</string>
     <string name="landing_have_account">I Already Have an Account</string>
     <string name="landing_legal_prefix">By continuing you agree to our</string>
+
+    <string name="location_picker_search_hint">Search for a venue or area…</string>
+    <string name="location_picker_finding_address">Finding address…</string>
+    <string name="location_picker_finding_address_short">Finding address…</string>
+    <string name="location_picker_geocode_error">Could not find address. Try again.</string>
+    <string name="location_picker_confirm">Confirm</string>
+    <string name="location_picker_move_map_hint">Move the map or search to choose a location.</string>
+    <string name="create_event_location_preview_hint">Tap to set event location</string>
+    <string name="create_event_location_preview_sub">Uses your current location by default</string>
+    <string name="create_event_location_error_required">Please select a location for this event</string>
+    <string name="location_permission_settings_hint">Enable location in Settings</string>
+    <string name="location_permission_open_settings">Open Settings</string>
 </resources>

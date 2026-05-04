@@ -1,10 +1,20 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+
 package com.android.example.eventpop.ui.screens
 
+import android.Manifest
+import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
@@ -17,18 +27,24 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,6 +55,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -51,19 +71,26 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.android.example.eventpop.R
+import com.android.example.eventpop.data.EventLocationData
 import com.android.example.eventpop.data.NamedLookupRow
 import com.android.example.eventpop.ui.mvc.CreateEventUiState
 import com.android.example.eventpop.ui.navigation.EventPopDestinations
@@ -72,11 +99,17 @@ import com.android.example.eventpop.ui.theme.CardBackground
 import com.android.example.eventpop.ui.theme.OrangeAccent
 import com.android.example.eventpop.ui.theme.SubtitleGray
 import com.android.example.eventpop.ui.viewmodel.CreateEventViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import org.maplibre.android.geometry.LatLng
 
 private val BodyBackground = Color(0xFFF4F6F9)
 private val FieldShape = RoundedCornerShape(12.dp)
 private val ErrorSurface = Color(0xFFFFEBEE)
 private val ErrorText = Color(0xFFB71C1C)
+private val LocationErrorRed = Color(0xFFE53935)
+private val Shadow6 = Color(0x0F000000)
+private val KampalaLatLng = LatLng(0.3476, 32.5825)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,6 +119,75 @@ fun CreateEventScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.snackbarMessages.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+
+    var showLocationSheet by remember { mutableStateOf(false) }
+    var sheetInitialPin by remember { mutableStateOf(KampalaLatLng) }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        val fine = grants[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val coarse = grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (!fine && !coarse) {
+            val act = context as? Activity ?: return@rememberLauncherForActivityResult
+            val showRationaleFine = ActivityCompat.shouldShowRequestPermissionRationale(
+                act,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            )
+            val showRationaleCoarse = ActivityCompat.shouldShowRequestPermissionRationale(
+                act,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+            if (!showRationaleFine && !showRationaleCoarse) {
+                scope.launch {
+                    val result = snackbarHostState.showSnackbar(
+                        message = context.getString(R.string.location_permission_settings_hint),
+                        actionLabel = context.getString(R.string.location_permission_open_settings),
+                        duration = SnackbarDuration.Long
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.fromParts("package", context.packageName, null)
+                        }
+                        runCatching { context.startActivity(intent) }
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(showLocationSheet) {
+        if (!showLocationSheet) return@LaunchedEffect
+        locationPermissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
+        val fineOk = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseOk = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val gps = if (fineOk || coarseOk) viewModel.getLastKnownLocationOrNull() else null
+        val loc = uiState.locationData
+        sheetInitialPin = when {
+            gps != null -> LatLng(gps.latitude, gps.longitude)
+            loc != null -> LatLng(loc.latitude, loc.longitude)
+            else -> KampalaLatLng
+        }
+    }
 
     LaunchedEffect(uiState.navigateToEventId) {
         val id = uiState.navigateToEventId ?: return@LaunchedEffect
@@ -103,6 +205,7 @@ fun CreateEventScreen(
 
     Scaffold(
         containerColor = BodyBackground,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -176,28 +279,37 @@ fun CreateEventScreen(
             }
 
             else -> {
-                CreateEventFormContent(
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding),
-                    uiState = uiState,
-                    onTitleChange = viewModel::setTitle,
-                    onLocationChange = viewModel::setLocation,
-                    onDescriptionChange = viewModel::setDescription,
-                    onIsFreeChange = viewModel::setIsFree,
-                    onPriceChange = viewModel::setPriceText,
-                    onDateChange = viewModel::setDateText,
-                    onStartTimeChange = viewModel::setStartTimeText,
-                    onEndTimeChange = viewModel::setEndTimeText,
-                    onLatChange = viewModel::setLatitudeText,
-                    onLngChange = viewModel::setLongitudeText,
-                    onAreaId = viewModel::setSelectedAreaId,
-                    onCategoryId = viewModel::setSelectedCategoryId,
-                    onPickImage = { pickImage.launch("image/*") },
-                    onRemoveImage = viewModel::clearCover,
-                    onPublish = viewModel::publish,
-                    onDismissError = viewModel::clearPublishError
-                )
+                        .padding(innerPadding)
+                ) {
+                    CreateEventFormContent(
+                        modifier = Modifier.fillMaxSize(),
+                        uiState = uiState,
+                        onTitleChange = viewModel::setTitle,
+                        onOpenLocationPicker = { showLocationSheet = true },
+                        onDescriptionChange = viewModel::setDescription,
+                        onIsFreeChange = viewModel::setIsFree,
+                        onPriceChange = viewModel::setPriceText,
+                        onDateChange = viewModel::setDateText,
+                        onStartTimeChange = viewModel::setStartTimeText,
+                        onEndTimeChange = viewModel::setEndTimeText,
+                        onAreaId = viewModel::setSelectedAreaId,
+                        onCategoryId = viewModel::setSelectedCategoryId,
+                        onPickImage = { pickImage.launch("image/*") },
+                        onRemoveImage = viewModel::clearCover,
+                        onPublish = viewModel::publish,
+                        onDismissError = viewModel::clearPublishError
+                    )
+                    if (showLocationSheet) {
+                        LocationPickerBottomSheet(
+                            viewModel = viewModel,
+                            initialPin = sheetInitialPin,
+                            onDismiss = { showLocationSheet = false }
+                        )
+                    }
+                }
             }
         }
     }
@@ -304,15 +416,13 @@ private fun CreateEventFormContent(
     modifier: Modifier = Modifier,
     uiState: CreateEventUiState,
     onTitleChange: (String) -> Unit,
-    onLocationChange: (String) -> Unit,
+    onOpenLocationPicker: () -> Unit,
     onDescriptionChange: (String) -> Unit,
     onIsFreeChange: (Boolean) -> Unit,
     onPriceChange: (String) -> Unit,
     onDateChange: (String) -> Unit,
     onStartTimeChange: (String) -> Unit,
     onEndTimeChange: (String) -> Unit,
-    onLatChange: (String) -> Unit,
-    onLngChange: (String) -> Unit,
     onAreaId: (String?) -> Unit,
     onCategoryId: (String?) -> Unit,
     onPickImage: () -> Unit,
@@ -323,6 +433,15 @@ private fun CreateEventFormContent(
     val fe = uiState.fieldErrors
     var showAreaPicker by remember { mutableStateOf(false) }
     var showCategoryPicker by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
+    val locationBringIntoView = remember { BringIntoViewRequester() }
+
+    LaunchedEffect(fe.location) {
+        if (fe.location != null) {
+            delay(80)
+            locationBringIntoView.bringIntoView()
+        }
+    }
 
     val areaLabel = uiState.areas.find { it.id == uiState.selectedAreaId }?.name.orEmpty()
     val categoryLabel = uiState.categories.find { it.id == uiState.selectedCategoryId }?.name.orEmpty()
@@ -352,7 +471,7 @@ private fun CreateEventFormContent(
 
     Column(
         modifier = modifier
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
         Text(
@@ -408,21 +527,21 @@ private fun CreateEventFormContent(
                 )
             )
             Spacer(modifier = Modifier.height(14.dp))
-            OutlinedTextField(
-                value = uiState.location,
-                onValueChange = onLocationChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.create_event_field_location)) },
-                isError = fe.location != null,
-                supportingText = { fe.location?.let { Text(it) } },
-                singleLine = true,
-                shape = FieldShape,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeAccent,
-                    focusedLabelColor = OrangeAccent,
-                    cursorColor = OrangeAccent
-                )
+            EventLocationPreviewCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewRequester(locationBringIntoView),
+                locationData = uiState.locationData,
+                onClick = onOpenLocationPicker
             )
+            fe.location?.let { msg ->
+                Text(
+                    text = msg,
+                    color = LocationErrorRed,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 6.dp, start = 4.dp)
+                )
+            }
             Spacer(modifier = Modifier.height(14.dp))
             OutlinedTextField(
                 value = uiState.description,
@@ -583,52 +702,6 @@ private fun CreateEventFormContent(
 
         SectionCard {
             Text(
-                stringResource(R.string.create_event_section_map),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = AppBarNavy,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            Text(
-                stringResource(R.string.create_event_map_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = SubtitleGray,
-                modifier = Modifier.padding(bottom = 10.dp)
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = uiState.latitudeText,
-                    onValueChange = onLatChange,
-                    modifier = Modifier.weight(1f),
-                    label = { Text(stringResource(R.string.create_event_field_lat)) },
-                    singleLine = true,
-                    shape = FieldShape,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = OrangeAccent,
-                        focusedLabelColor = OrangeAccent,
-                        cursorColor = OrangeAccent
-                    )
-                )
-                OutlinedTextField(
-                    value = uiState.longitudeText,
-                    onValueChange = onLngChange,
-                    modifier = Modifier.weight(1f),
-                    label = { Text(stringResource(R.string.create_event_field_lng)) },
-                    singleLine = true,
-                    shape = FieldShape,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = OrangeAccent,
-                        focusedLabelColor = OrangeAccent,
-                        cursorColor = OrangeAccent
-                    )
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        SectionCard {
-            Text(
                 stringResource(R.string.create_event_section_cover),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
@@ -701,6 +774,84 @@ private fun CreateEventFormContent(
             }
         }
         Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun EventLocationPreviewCard(
+    modifier: Modifier = Modifier,
+    locationData: EventLocationData?,
+    onClick: () -> Unit
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = stringResource(R.string.create_event_field_location),
+            style = MaterialTheme.typography.bodySmall,
+            color = SubtitleGray,
+            modifier = Modifier.padding(bottom = 6.dp, start = 4.dp)
+        )
+        OutlinedCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
+            shape = FieldShape,
+            border = BorderStroke(1.dp, Color(0xFFE0E0E0)),
+            colors = CardDefaults.outlinedCardColors(containerColor = CardBackground)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.LocationOn,
+                    contentDescription = null,
+                    tint = OrangeAccent,
+                    modifier = Modifier.size(28.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    if (locationData == null) {
+                        Text(
+                            stringResource(R.string.create_event_location_preview_hint),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AppBarNavy
+                        )
+                        Text(
+                            stringResource(R.string.create_event_location_preview_sub),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = SubtitleGray,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    } else {
+                        Text(
+                            locationData.placeName,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AppBarNavy,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            locationData.displayAddress,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = SubtitleGray,
+                            modifier = Modifier.padding(top = 4.dp),
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                Icon(
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = null,
+                    tint = SubtitleGray,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
     }
 }
 
