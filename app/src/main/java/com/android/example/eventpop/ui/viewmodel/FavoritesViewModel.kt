@@ -60,4 +60,14 @@ class FavoritesViewModel(
             }
         }
     }
+
+    fun removeFromFavorites(eventId: String) {
+        viewModelScope.launch {
+            if (!AuthRepository.isLoggedIn()) return@launch
+            val ok = eventRepository.setEventInterested(eventId, interested = false)
+            if (ok) {
+                favorites.value = favorites.value.filter { it.id != eventId }
+            }
+        }
+    }
 }

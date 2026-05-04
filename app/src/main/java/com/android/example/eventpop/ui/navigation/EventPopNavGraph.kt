@@ -183,7 +183,17 @@ fun EventPopNavGraph(
                 onNavMap = navMap,
                 onNavDiscover = navDiscover,
                 onNavFavorites = navFavorites,
-                onNavProfile = navProfile
+                onNavProfile = navProfile,
+                onSignIn = {
+                    context.startActivity(
+                        Intent(context, LandingPageActivity::class.java).apply {
+                            addFlags(
+                                Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            )
+                        }
+                    )
+                },
+                onRemoveFavorite = { favoritesViewModel.removeFromFavorites(it.id) }
             )
         }
 
