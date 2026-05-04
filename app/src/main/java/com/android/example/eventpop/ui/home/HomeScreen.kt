@@ -1,81 +1,123 @@
 package com.android.example.eventpop.ui.home
 
-import android.content.res.Configuration
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.TheaterComedy
+import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import androidx.compose.ui.unit.sp
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
 import coil.request.ImageRequest
 import com.android.example.eventpop.R
+import com.android.example.eventpop.data.AuthRepository
 import com.android.example.eventpop.data.Event
 import com.android.example.eventpop.data.EventCategory
 import com.android.example.eventpop.data.EventFilter
 import com.android.example.eventpop.data.EventLocation
 import com.android.example.eventpop.data.EventType
 import com.android.example.eventpop.data.TimeRange
+import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.CardBackground
-import com.android.example.eventpop.ui.theme.EventPopTheme
-import com.android.example.eventpop.ui.theme.HotSectionNavy
 import com.android.example.eventpop.ui.theme.OrangeAccent
-import com.android.example.eventpop.ui.theme.StarFilled
-import com.android.example.eventpop.ui.theme.StarUnfilled
-import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.SubtitleGray
 import com.android.example.eventpop.ui.mvc.HomeUiState
+import java.util.Calendar
+import kotlin.math.PI
+import kotlin.math.sin
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.lerp
+import coil.compose.AsyncImagePainter
 
+private val BodyBackground = Color(0xFFF4F6F9)
+private val ChipBorderGray = Color(0xFFE0E0E0)
+private val ShimmerLow = Color(0xFFE0E0E0)
+private val ShimmerHigh = Color(0xFFF5F5F5)
+private val ShadowBlack8 = Color(0x14000000)
 
-private val EventThumbnailHeight = 80.dp
-private val EventThumbnailWidth = 80.dp
-private val CardElevation = 2.dp
-private val CardShape = RoundedCornerShape(12.dp)
-private val HotSectionShape = RoundedCornerShape(12.dp)
+private val HotCardWidth = 180.dp
+private val HotCardHeight = 220.dp
+private val ThumbnailSize = 88.dp
+private val CardCorner = 16.dp
+private val SectionSpacing = 20.dp
 
 private fun EventFilter.applyTo(events: List<Event>): List<Event> {
     return events.filter { event ->
@@ -99,6 +141,61 @@ private fun EventFilter.applyTo(events: List<Event>): List<Event> {
     }
 }
 
+private fun Event.matchesQuickType(type: EventType): Boolean = when (type) {
+    EventType.MUSIC -> category == EventCategory.MUSIC
+    EventType.FOOD -> category == EventCategory.FOOD
+    EventType.COMEDY -> category == EventCategory.COMEDY
+    EventType.ART -> category == EventCategory.ART
+    EventType.SOOTHE -> category == EventCategory.WELLNESS
+}
+
+private fun timeOfDayGreetingRes(): Int {
+    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    return when (hour) {
+        in 5..11 -> R.string.home_greeting_morning
+        in 12..16 -> R.string.home_greeting_afternoon
+        else -> R.string.home_greeting_evening
+    }
+}
+
+private fun EventType.leadingIcon() = when (this) {
+    EventType.MUSIC -> Icons.Filled.MusicNote
+    EventType.FOOD -> Icons.Filled.Restaurant
+    EventType.COMEDY -> Icons.Filled.TheaterComedy
+    EventType.ART -> Icons.Filled.Palette
+    EventType.SOOTHE -> Icons.Filled.Spa
+}
+
+@Composable
+private fun ShimmerBrush(): Brush {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase"
+    )
+    val shimmer = (sin((phase * 2 * PI).toDouble()).toFloat() * 0.5f + 0.5f)
+    val c = lerp(ShimmerLow, ShimmerHigh, shimmer)
+    return Brush.linearGradient(
+        colors = listOf(ShimmerLow, c, ShimmerHigh, c, ShimmerLow),
+        start = Offset(phase * 400f, 0f),
+        end = Offset(phase * 400f + 200f, 120f)
+    )
+}
+
+@Composable
+private fun ShimmerBox(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(ShimmerBrush())
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -120,35 +217,74 @@ fun HomeScreen(
     selectedFavorites: Boolean = false,
     selectedProfile: Boolean = false
 ) {
-    val displayedEvents =
+    val profile = AuthRepository.currentProfile()
+    val displayName = profile.displayName?.takeIf { it.isNotBlank() } ?: "Guest"
+
+    var quickFilterOrdinal by rememberSaveable { mutableStateOf<Int?>(null) }
+    val quickType: EventType? = quickFilterOrdinal?.let { EventType.entries.getOrNull(it) }
+
+    val baseEvents =
         if (currentFilter != null) currentFilter.applyTo(uiState.events) else uiState.events
+    val displayedEvents =
+        if (quickType == null) baseEvents else baseEvents.filter { it.matchesQuickType(quickType) }
+
     Scaffold(
+        containerColor = BodyBackground,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.home_greeting),
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                },
-                actions = {
-                    IconButton(onClick = onSearchClick) {
-                        Icon(
-                            imageVector = Icons.Filled.Search,
-                            contentDescription = stringResource(R.string.search_title),
-                            tint = Color.White
+            Column {
+                TopAppBar(
+                    modifier = Modifier,
+                    navigationIcon = {
+                        UserAvatarLeading(
+                            displayName = displayName,
+                            avatarUrl = null
                         )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = AppBarNavy,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White,
-                    actionIconContentColor = Color.White
+                    },
+                    title = {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = stringResource(timeOfDayGreetingRes()),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                            Text(
+                                text = "$displayName 👋",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    },
+                    actions = {
+                        Box(
+                            modifier = Modifier
+                                .padding(end = 8.dp)
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(OrangeAccent)
+                                .clickable(onClick = onSearchClick),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Search,
+                                contentDescription = stringResource(R.string.search_title),
+                                tint = Color.White
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = AppBarNavy,
+                        titleContentColor = Color.White,
+                        navigationIconContentColor = Color.White,
+                        actionIconContentColor = Color.White,
+                        scrolledContainerColor = AppBarNavy
+                    )
                 )
-            )
+                HorizontalDivider(
+                    thickness = 1.dp,
+                    color = Color.White.copy(alpha = 0.1f)
+                )
+            }
         },
         bottomBar = {
             EventPopBottomBar(
@@ -168,50 +304,68 @@ fun HomeScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(innerPadding)
+                .background(BodyBackground)
+                .padding(horizontal = 16.dp)
+                .padding(top = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(SectionSpacing)
         ) {
             if (onFilterClick != null) {
-                item {
-                    OutlinedButton(
-                        onClick = onFilterClick,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeAccent),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, OrangeAccent),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.filter_events_title),
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+                item(key = "filter_chips") {
+                    FilterChipStrip(
+                        quickFilterOrdinal = quickFilterOrdinal,
+                        onQuickFilterChange = { quickFilterOrdinal = it },
+                        onOpenFullFilters = onFilterClick
+                    )
                 }
             }
 
             if (uiState.hotEvents.isNotEmpty()) {
-                item {
-                    HotEventsSection(
+                item(key = "hot_header") {
+                    SectionHeaderRow(
+                        title = "🔥 ${stringResource(R.string.hot_events_near_you)}",
+                        actionLabel = stringResource(R.string.see_all_arrow),
+                        onAction = onSeeAllHotEvents
+                    )
+                }
+                item(key = "hot_row") {
+                    HotEventsRow(
                         hotEvents = uiState.hotEvents,
-                        onSeeAll = onSeeAllHotEvents,
                         onEventClick = onEventClick
                     )
                 }
             }
 
             if (uiState.isLoading) {
-                item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = OrangeAccent)
-                    }
+                items(
+                    count = 3,
+                    key = { idx -> "skeleton-$idx" }
+                ) { _ ->
+                    EventCardSkeleton(modifier = Modifier.fillMaxWidth())
                 }
             }
-            items(displayedEvents) { event ->
+
+            if (!uiState.isLoading && displayedEvents.isEmpty()) {
+                item(key = "empty") {
+                    HomeEmptyState(
+                        onRetry = onFilterClick,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = 320.dp)
+                    )
+                }
+            }
+
+            items(
+                items = displayedEvents,
+                key = { it.id },
+                contentType = { _ -> "event" }
+            ) { event ->
                 EventCard(
                     event = event,
                     onRsvp = { onEventRsvp(event) },
-                    onClick = { onEventClick(event) }
+                    onClick = { onEventClick(event) },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
@@ -219,77 +373,381 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HotEventsSection(
-    hotEvents: List<Event>,
-    onSeeAll: () -> Unit,
-    onEventClick: (Event) -> Unit
+private fun UserAvatarLeading(
+    displayName: String,
+    avatarUrl: String?
 ) {
-    Card(
+    val initials = displayName
+        .split(" ")
+        .filter { it.isNotBlank() }
+        .take(2)
+        .joinToString("") { it.first().uppercaseChar().toString() }
+        .ifBlank { "?" }
+
+    Box(
+        modifier = Modifier
+            .padding(start = 4.dp)
+            .size(32.dp)
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.12f)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (!avatarUrl.isNullOrBlank()) {
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(avatarUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                when (painter.state) {
+                    is AsyncImagePainter.State.Success -> SubcomposeAsyncImageContent()
+                    else -> Text(
+                        text = initials,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        } else {
+            Text(
+                text = initials,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun FilterChipStrip(
+    quickFilterOrdinal: Int?,
+    onQuickFilterChange: (Int?) -> Unit,
+    onOpenFullFilters: () -> Unit
+) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        item(key = "all") {
+            HomeFilterChip(
+                label = stringResource(R.string.home_filter_all),
+                selected = quickFilterOrdinal == null,
+                onClick = { onQuickFilterChange(null) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Apps,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            )
+        }
+        items(EventType.entries.toList(), key = { it.name }) { type ->
+            val ord = type.ordinal
+            HomeFilterChip(
+                label = type.label,
+                selected = quickFilterOrdinal == ord,
+                onClick = {
+                    onQuickFilterChange(if (quickFilterOrdinal == ord) null else ord)
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = type.leadingIcon(),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            )
+        }
+        item(key = "more") {
+            HomeFilterChip(
+                label = stringResource(R.string.home_filter_more),
+                selected = false,
+                onClick = onOpenFullFilters,
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Tune,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeFilterChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    leadingIcon: @Composable () -> Unit
+) {
+    val containerColor by animateColorAsState(
+        targetValue = if (selected) OrangeAccent else CardBackground,
+        animationSpec = tween(200),
+        label = "chipBg"
+    )
+    val labelColor by animateColorAsState(
+        targetValue = if (selected) Color.White else SubtitleGray,
+        animationSpec = tween(200),
+        label = "chipFg"
+    )
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        leadingIcon = leadingIcon,
+        modifier = Modifier
+            .heightIn(min = 36.dp)
+            .animateContentSize(),
+        shape = RoundedCornerShape(20.dp),
+        border = if (selected) null else BorderStroke(1.dp, ChipBorderGray),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = containerColor,
+            labelColor = labelColor,
+            iconColor = labelColor,
+            selectedContainerColor = OrangeAccent,
+            selectedLabelColor = Color.White,
+            selectedLeadingIconColor = Color.White
+        )
+    )
+}
+
+@Composable
+private fun SectionHeaderRow(
+    title: String,
+    actionLabel: String,
+    onAction: () -> Unit
+) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = HotSectionShape,
-        colors = CardDefaults.cardColors(containerColor = HotSectionNavy),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            .padding(top = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.padding(vertical = 8.dp)) {
-            Row(
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = AppBarNavy
+        )
+        Text(
+            text = actionLabel,
+            style = MaterialTheme.typography.labelMedium,
+            color = OrangeAccent,
+            modifier = Modifier.clickable(onClick = onAction)
+        )
+    }
+}
+
+@Composable
+private fun HotEventsRow(
+    hotEvents: List<Event>,
+    onEventClick: (Event) -> Unit
+) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        items(hotEvents, key = { it.id }) { event ->
+            HotEventCard(
+                event = event,
+                onClick = { onEventClick(event) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun HotEventCard(
+    event: Event,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "hotScale"
+    )
+    Box(
+        modifier = Modifier
+            .width(HotCardWidth)
+            .height(HotCardHeight)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                transformOrigin = TransformOrigin.Center
+            }
+            .clip(RoundedCornerShape(CardCorner))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = ripple(),
+                onClick = onClick
+            )
+    ) {
+        SubcomposeAsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(event.imageUrl)
+                .crossfade(true)
+                .build(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            when (painter.state) {
+                is AsyncImagePainter.State.Success -> SubcomposeAsyncImageContent()
+                else -> ShimmerBox(Modifier.fillMaxSize())
+            }
+        }
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0f to Color.Transparent,
+                            0.5f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.7f)
+                        )
+                    )
+                )
+        )
+        Text(
+            text = event.category.displayName.uppercase().take(5),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(OrangeAccent)
+                .padding(horizontal = 6.dp, vertical = 4.dp)
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(12.dp)
+        ) {
+            Text(
+                text = event.title,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = event.subtitle,
+                color = Color.White.copy(alpha = 0.75f),
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun EventCardSkeleton(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .shadow(4.dp, RoundedCornerShape(CardCorner), ambientColor = ShadowBlack8, spotColor = ShadowBlack8)
+            .clip(RoundedCornerShape(CardCorner))
+            .background(CardBackground)
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        ShimmerBox(
+            modifier = Modifier
+                .size(ThumbnailSize)
+                .clip(RoundedCornerShape(12.dp))
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            ShimmerBox(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "\uD83D\uDD25 ${stringResource(R.string.hot_events_title)}",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleMedium
+                    .height(16.dp)
+                    .clip(RoundedCornerShape(4.dp))
+            )
+            ShimmerBox(
+                modifier = Modifier
+                    .fillMaxWidth(fraction = 0.72f)
+                    .height(12.dp)
+                    .clip(RoundedCornerShape(4.dp))
+            )
+            ShimmerBox(
+                modifier = Modifier
+                    .width(80.dp)
+                    .height(12.dp)
+                    .clip(RoundedCornerShape(4.dp))
+            )
+        }
+        ShimmerBox(
+            modifier = Modifier
+                .width(72.dp)
+                .height(36.dp)
+                .clip(RoundedCornerShape(8.dp))
+        )
+    }
+}
+
+@Composable
+private fun HomeEmptyState(
+    onRetry: (() -> Unit)?,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_event_placeholder),
+            contentDescription = null,
+            modifier = Modifier.size(120.dp),
+            tint = SubtitleGray.copy(alpha = 0.4f)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.home_no_events),
+            style = MaterialTheme.typography.titleMedium,
+            color = AppBarNavy,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.home_no_events_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = SubtitleGray,
+            textAlign = TextAlign.Center
+        )
+        if (onRetry != null) {
+            Spacer(modifier = Modifier.height(20.dp))
+            OutlinedButton(
+                onClick = onRetry,
+                border = BorderStroke(1.dp, OrangeAccent),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = OrangeAccent,
+                    containerColor = CardBackground
                 )
-                Text(
-                    text = stringResource(R.string.see_all),
-                    color = OrangeAccent,
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier
-                        .padding(start = 8.dp)
-                        .clickable(onClick = onSeeAll)
-                )
-            }
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
             ) {
-                items(hotEvents, key = { it.id }) { event ->
-                    Card(
-                        modifier = Modifier
-                            .width(168.dp)
-                            .clickable { onEventClick(event) },
-                        shape = RoundedCornerShape(10.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color.White.copy(alpha = 0.1f)
-                        )
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = event.title,
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold,
-                                style = MaterialTheme.typography.titleSmall,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = event.subtitle,
-                                color = Color.White.copy(alpha = 0.75f),
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                        }
-                    }
-                }
+                Text(stringResource(R.string.home_retry))
             }
         }
     }
@@ -299,113 +757,113 @@ private fun HotEventsSection(
 private fun EventCard(
     event: Event,
     onRsvp: () -> Unit,
-    onClick: () -> Unit = {}
+    onClick: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = Modifier
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "cardScale"
+    )
+    Row(
+        modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clickable(onClick = onClick),
-        shape = CardShape,
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
-        elevation = CardDefaults.cardElevation(defaultElevation = CardElevation)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                transformOrigin = TransformOrigin.Center
+            }
+            .shadow(4.dp, RoundedCornerShape(CardCorner), ambientColor = ShadowBlack8, spotColor = ShadowBlack8)
+            .clip(RoundedCornerShape(CardCorner))
+            .background(CardBackground)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = ripple(),
+                onClick = onClick
+            )
+            .padding(12.dp),
+        verticalAlignment = Alignment.Top
     ) {
-        Row(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.Top
+                .size(ThumbnailSize)
+                .clip(RoundedCornerShape(12.dp))
         ) {
-            Box(
-                modifier = Modifier
-                    .size(EventThumbnailWidth, EventThumbnailHeight)
-                    .clip(RoundedCornerShape(8.dp))
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(event.imageUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
             ) {
-                if (event.imageUrl != null) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(event.imageUrl)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_event_placeholder),
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                }
-                if (event.rsvpCount != null) {
-                    Card(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(4.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.6f)),
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.rsvp_count, event.rsvpCount),
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
+                when (painter.state) {
+                    is AsyncImagePainter.State.Success -> SubcomposeAsyncImageContent()
+                    else -> ShimmerBox(Modifier.fillMaxSize())
                 }
             }
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+            if (event.rsvpCount != null) {
+                Text(
+                    text = stringResource(R.string.rsvp_count, event.rsvpCount),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(OrangeAccent)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
+        }
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = event.title,
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = event.subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = SubtitleGray
-                        )
-                        if (event.rating != null) {
-                            StarRating(
-                                rating = event.rating,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                        }
-                    }
+                Text(
+                    text = event.title,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = AppBarNavy,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = event.subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = SubtitleGray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (event.rating != null) {
+                    StarRating(rating = event.rating)
                 }
-                Button(
-                    onClick = onRsvp,
-                    colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = ButtonDefaults.ContentPadding,
-                    modifier = Modifier.padding(start = 8.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.rsvp),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                }
+            }
+            Button(
+                onClick = onRsvp,
+                colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .defaultMinSize(minWidth = 72.dp)
+                    .height(36.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.rsvp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White
+                )
             }
         }
     }
@@ -419,22 +877,22 @@ private fun StarRating(
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         val fullStars = rating.toInt().coerceIn(0, 5)
         repeat(5) { index ->
             Icon(
                 imageVector = if (index < fullStars) Icons.Filled.Star else Icons.Outlined.Star,
                 contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = if (index < fullStars) StarFilled else StarUnfilled
+                modifier = Modifier.size(12.dp),
+                tint = if (index < fullStars) OrangeAccent else SubtitleGray.copy(alpha = 0.35f)
             )
         }
         Text(
             text = "%.1f".format(rating),
             style = MaterialTheme.typography.labelSmall,
             color = SubtitleGray,
-            modifier = Modifier.padding(start = 4.dp)
+            modifier = Modifier.padding(start = 2.dp)
         )
     }
 }

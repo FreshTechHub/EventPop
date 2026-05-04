@@ -36,7 +36,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
@@ -85,10 +84,9 @@ fun AuthBrandingHeader(
             verticalArrangement = Arrangement.Center
         ) {
             Image(
-                painter = painterResource(R.drawable.ic_launcher_foreground),
-                contentDescription = null,
-                modifier = Modifier.size(56.dp),
-                colorFilter = ColorFilter.tint(AuthUiTokens.Surface)
+                painter = painterResource(R.drawable.icon),
+                contentDescription = stringResource(R.string.app_name),
+                modifier = Modifier.size(56.dp)
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
