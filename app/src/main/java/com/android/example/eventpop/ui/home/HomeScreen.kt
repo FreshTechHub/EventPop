@@ -83,11 +83,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
 import coil.request.ImageRequest
+import com.android.example.eventpop.EventPopApp
 import com.android.example.eventpop.R
 import com.android.example.eventpop.data.AuthRepository
+import com.android.example.eventpop.data.LocalProfile
+import com.android.example.eventpop.ui.components.AvatarComposable
 import com.android.example.eventpop.data.Event
 import com.android.example.eventpop.data.EventCategory
 import com.android.example.eventpop.data.EventFilter
@@ -217,8 +221,14 @@ fun HomeScreen(
     selectedFavorites: Boolean = false,
     selectedProfile: Boolean = false
 ) {
-    val profile = AuthRepository.currentProfile()
-    val displayName = profile.displayName?.takeIf { it.isNotBlank() } ?: "Guest"
+    val ctx = LocalContext.current
+    val app = remember(ctx.applicationContext) { ctx.applicationContext as EventPopApp }
+    val localProfile by app.profileLocalDataStore.getProfile()
+        .collectAsStateWithLifecycle(LocalProfile())
+    val authSnap = AuthRepository.currentProfile()
+    val displayName = localProfile.displayName.takeIf { it.isNotBlank() }
+        ?: authSnap.displayName?.takeIf { it.isNotBlank() }
+        ?: "Guest"
 
     var quickFilterOrdinal by rememberSaveable { mutableStateOf<Int?>(null) }
     val quickType: EventType? = quickFilterOrdinal?.let { EventType.entries.getOrNull(it) }
@@ -235,10 +245,21 @@ fun HomeScreen(
                 TopAppBar(
                     modifier = Modifier,
                     navigationIcon = {
-                        UserAvatarLeading(
-                            displayName = displayName,
-                            avatarUrl = null
-                        )
+                        Box(
+                            modifier = Modifier
+                                .padding(start = 4.dp)
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .clickable(onClick = onNavProfile),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            AvatarComposable(
+                                avatarUrl = localProfile.avatarUrl,
+                                avatarLocalPath = localProfile.avatarLocalPath,
+                                displayName = displayName,
+                                size = 32.dp
+                            )
+                        }
                     },
                     title = {
                         Column(modifier = Modifier.fillMaxWidth()) {
@@ -368,57 +389,6 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun UserAvatarLeading(
-    displayName: String,
-    avatarUrl: String?
-) {
-    val initials = displayName
-        .split(" ")
-        .filter { it.isNotBlank() }
-        .take(2)
-        .joinToString("") { it.first().uppercaseChar().toString() }
-        .ifBlank { "?" }
-
-    Box(
-        modifier = Modifier
-            .padding(start = 4.dp)
-            .size(32.dp)
-            .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.12f)),
-        contentAlignment = Alignment.Center
-    ) {
-        if (!avatarUrl.isNullOrBlank()) {
-            SubcomposeAsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(avatarUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                when (painter.state) {
-                    is AsyncImagePainter.State.Success -> SubcomposeAsyncImageContent()
-                    else -> Text(
-                        text = initials,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-        } else {
-            Text(
-                text = initials,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp
-            )
         }
     }
 }

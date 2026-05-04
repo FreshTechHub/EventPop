@@ -57,5 +57,15 @@ data class FavoritesUiState(
 data class ProfileUiState(
     val email: String = "",
     val displayName: String = "Guest",
-    val isLoggedIn: Boolean = false
+    val isLoggedIn: Boolean = false,
+    val avatarUrl: String = "",
+    val avatarLocalPath: String = "",
+    val isUploadingAvatar: Boolean = false,
+    val isUpdatingName: Boolean = false,
+    val isUpdatingEmail: Boolean = false,
+    val emailUpdatePending: Boolean = false,
+    val avatarUploadProgress: Float = 0f,
+    val successMessage: String? = null,
+    val errorMessage: String? = null,
+    val snackbarRetryable: Boolean = false
 )

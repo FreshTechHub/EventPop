@@ -98,6 +98,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.android.example.eventpop.R
 import com.android.example.eventpop.data.Event
+import com.android.example.eventpop.ui.components.AvatarComposable
 import com.android.example.eventpop.ui.mvc.EventDetailUiState
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.ContentGray
@@ -713,12 +714,6 @@ private fun OrganizerBlock(event: Event, modifier: Modifier = Modifier) {
         visible = true
     }
     val name = event.organizerName ?: "Unknown Organizer"
-    val initials = name.trim()
-        .split(" ")
-        .filter { it.isNotEmpty() }
-        .take(2)
-        .joinToString("") { it.first().uppercaseChar().toString() }
-        .ifEmpty { "?" }
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 12 },
@@ -730,20 +725,14 @@ private fun OrganizerBlock(event: Event, modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(lightenColor(AppBarNavy, 0.18f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = initials,
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                AvatarComposable(
+                    avatarUrl = "",
+                    avatarLocalPath = "",
+                    displayName = name,
+                    size = 44.dp,
+                    initialsFontSize = 14.sp,
+                    modifier = Modifier.clip(CircleShape)
+                )
                 Column(
                     modifier = Modifier
                         .weight(1f)

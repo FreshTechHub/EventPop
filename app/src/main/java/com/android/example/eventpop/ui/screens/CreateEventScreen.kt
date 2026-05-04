@@ -94,6 +94,7 @@ import com.android.example.eventpop.data.EventLocationData
 import com.android.example.eventpop.data.NamedLookupRow
 import com.android.example.eventpop.ui.mvc.CreateEventUiState
 import com.android.example.eventpop.ui.navigation.EventPopDestinations
+import com.android.example.eventpop.ui.util.MediaPickPermissions
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.CardBackground
 import com.android.example.eventpop.ui.theme.OrangeAccent
@@ -203,6 +204,26 @@ fun CreateEventScreen(
         viewModel.onCoverPicked(uri)
     }
 
+    val galleryPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { granted ->
+        if (granted.values.all { it }) {
+            pickImage.launch("image/*")
+        } else {
+            scope.launch {
+                snackbarHostState.showSnackbar(context.getString(R.string.media_permission_rationale))
+            }
+        }
+    }
+
+    fun launchCoverImagePicker() {
+        val perms = MediaPickPermissions.galleryPermissions()
+        val ok = perms.all {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (ok) pickImage.launch("image/*") else galleryPermissionLauncher.launch(perms)
+    }
+
     Scaffold(
         containerColor = BodyBackground,
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -297,7 +318,7 @@ fun CreateEventScreen(
                         onEndTimeChange = viewModel::setEndTimeText,
                         onAreaId = viewModel::setSelectedAreaId,
                         onCategoryId = viewModel::setSelectedCategoryId,
-                        onPickImage = { pickImage.launch("image/*") },
+                        onPickImage = { launchCoverImagePicker() },
                         onRemoveImage = viewModel::clearCover,
                         onPublish = viewModel::publish,
                         onDismissError = viewModel::clearPublishError

@@ -1,8 +1,12 @@
 package com.android.example.eventpop.ui.screens
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -55,6 +59,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
@@ -63,6 +72,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,8 +93,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.LaunchedEffect
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import com.android.example.eventpop.R
+import com.android.example.eventpop.data.ProfileRepository
+import com.android.example.eventpop.ui.util.MediaPickPermissions
+import com.android.example.eventpop.ui.viewmodel.ProfileViewModel
+import com.yalantis.ucrop.UCrop
+import kotlinx.coroutines.launch
+import java.io.File
 import com.android.example.eventpop.ui.mvc.ProfileUiState
 import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.AppBarNavy
@@ -98,6 +116,7 @@ private val DividerVertical = Color(0xFFE0E0E0)
 private val ChevronMuted = Color(0xFFC4C4C4)
 private val Shadow6 = Color(0x0F000000)
 private val ErrorRed = Color(0xFFE53935)
+private val SuccessSnackbarGreen = Color(0xFF059669)
 
 private val ugandaCities = listOf(
     "Kampala", "Entebbe", "Jinja", "Mbarara", "Gulu",
@@ -135,6 +154,8 @@ private fun ProfileStatusBarSideEffect() {
 @Composable
 fun ProfileScreen(
     uiState: ProfileUiState,
+    profileViewModel: ProfileViewModel,
+    rsvpCount: Int,
     onNavEvents: () -> Unit,
     onNavMap: () -> Unit,
     onNavDiscover: () -> Unit,
@@ -144,31 +165,191 @@ fun ProfileScreen(
     onLogoutConfirmed: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     ProfileStatusBarSideEffect()
 
-    var localDisplayName by remember(uiState.displayName) { mutableStateOf(uiState.displayName) }
-    LaunchedEffect(uiState.displayName) {
-        localDisplayName = uiState.displayName
-    }
-    val email = uiState.email
     var city by remember { mutableStateOf("Kampala") }
     var notificationsEnabled by remember { mutableStateOf(true) }
 
     var showCityDialog by remember { mutableStateOf(false) }
-    var showEditUsernameDialog by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showFeedbackDialog by remember { mutableStateOf(false) }
-    var editNameField by remember { mutableStateOf(localDisplayName) }
     var feedbackText by remember { mutableStateOf("") }
 
-    val initials = localDisplayName.trim()
-        .split(" ")
-        .filter { it.isNotEmpty() }
-        .take(2)
-        .joinToString("") { it.first().uppercaseChar().toString() }
-        .ifEmpty { "?" }
+    var showAvatarSheet by remember { mutableStateOf(false) }
+    var showEditSheet by remember { mutableStateOf(false) }
+    var showRemoveAvatarConfirm by remember { mutableStateOf(false) }
+
+    var pendingPermissionAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    val cropLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { res ->
+        if (res.resultCode == Activity.RESULT_OK) {
+            val data = res.data ?: return@rememberLauncherForActivityResult
+            val out = UCrop.getOutput(data) ?: return@rememberLauncherForActivityResult
+            profileViewModel.onAvatarSelected(out)
+        }
+    }
+
+    fun launchCrop(source: Uri) {
+        val destFile = File(context.cacheDir, "avatar_cropped.jpg")
+        val destUri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            destFile
+        )
+        val opts = UCrop.Options().apply {
+            setCircleDimmedLayer(true)
+            setShowCropGrid(false)
+            setToolbarColor(AppBarNavy.toArgb())
+            setToolbarWidgetColor(android.graphics.Color.WHITE)
+            setActiveControlsWidgetColor(OrangeAccent.toArgb())
+            setStatusBarColor(AppBarNavy.toArgb())
+        }
+        val intent = UCrop.of(source, destUri)
+            .withAspectRatio(1f, 1f)
+            .withMaxResultSize(800, 800)
+            .withOptions(opts)
+            .getIntent(context)
+        cropLauncher.launch(intent)
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { launchCrop(it) }
+    }
+
+    val captureFile = remember(context) { ProfileRepository.tempCaptureFile(context) }
+    val captureUri = remember(context) {
+        FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            captureFile
+        )
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { ok ->
+        if (ok) launchCrop(captureUri)
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { granted ->
+        if (granted.values.all { it }) {
+            pendingPermissionAction?.invoke()
+        }
+        pendingPermissionAction = null
+    }
+
+    fun ensurePermissionsThen(permissions: Array<String>, action: () -> Unit) {
+        val ok = permissions.all {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (ok) action()
+        else {
+            pendingPermissionAction = action
+            permissionLauncher.launch(permissions)
+        }
+    }
+
+    LaunchedEffect(uiState.successMessage) {
+        val msg = uiState.successMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(
+            message = msg,
+            duration = SnackbarDuration.Short
+        )
+        profileViewModel.dismissMessages()
+    }
+
+    LaunchedEffect(uiState.errorMessage) {
+        val msg = uiState.errorMessage ?: return@LaunchedEffect
+        val retryable = uiState.snackbarRetryable
+        val result = snackbarHostState.showSnackbar(
+            message = msg,
+            actionLabel = if (retryable) context.getString(R.string.profile_snackbar_retry) else null,
+            duration = SnackbarDuration.Long,
+            withDismissAction = true
+        )
+        if (result == SnackbarResult.ActionPerformed && retryable) {
+            profileViewModel.retrySnackbarAction()
+        }
+        profileViewModel.dismissMessages()
+    }
+
+    val hasAvatar = uiState.avatarUrl.isNotBlank() ||
+        (uiState.avatarLocalPath.isNotBlank() && File(uiState.avatarLocalPath).exists())
+
+    AvatarOptionsSheet(
+        visible = showAvatarSheet,
+        hasAvatar = hasAvatar,
+        onDismiss = { showAvatarSheet = false },
+        onTakePhoto = {
+            ensurePermissionsThen(MediaPickPermissions.cameraPermission()) {
+                scope.launch {
+                    runCatching {
+                        captureFile.parentFile?.mkdirs()
+                        captureFile.createNewFile()
+                    }
+                    cameraLauncher.launch(captureUri)
+                }
+            }
+        },
+        onChooseGallery = {
+            ensurePermissionsThen(MediaPickPermissions.galleryPermissions()) {
+                galleryLauncher.launch("image/*")
+            }
+        },
+        onRemovePhoto = { showRemoveAvatarConfirm = true }
+    )
+
+    EditProfileBottomSheet(
+        visible = showEditSheet,
+        uiState = uiState,
+        initialDisplayName = uiState.displayName,
+        initialEmail = uiState.email,
+        onDismiss = { showEditSheet = false },
+        onSaveDisplayName = profileViewModel::onUpdateDisplayName,
+        onSaveEmail = profileViewModel::onUpdateEmail
+    )
+
+    if (showRemoveAvatarConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRemoveAvatarConfirm = false },
+            shape = DialogShape,
+            title = {
+                Text(
+                    stringResource(R.string.profile_remove_photo_confirm_title),
+                    fontWeight = FontWeight.Bold,
+                    color = AppBarNavy
+                )
+            },
+            text = {
+                Text(stringResource(R.string.profile_remove_photo_confirm_body), color = SubtitleGray)
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showRemoveAvatarConfirm = false
+                        profileViewModel.onRemoveAvatar()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
+                    shape = DialogButtonShape
+                ) { Text(stringResource(R.string.profile_remove_photo), color = Color.White) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRemoveAvatarConfirm = false }) {
+                    Text(stringResource(R.string.profile_cancel), color = SubtitleGray)
+                }
+            }
+        )
+    }
 
     if (showCityDialog) {
         AlertDialog(
@@ -220,53 +401,6 @@ fun ProfileScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showCityDialog = false }) {
-                    Text("Cancel", color = SubtitleGray)
-                }
-            }
-        )
-    }
-
-    if (showEditUsernameDialog) {
-        AlertDialog(
-            onDismissRequest = { showEditUsernameDialog = false },
-            shape = DialogShape,
-            title = {
-                Text(
-                    "Edit Username",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AppBarNavy
-                )
-            },
-            text = {
-                OutlinedTextField(
-                    value = editNameField,
-                    onValueChange = { editNameField = it },
-                    label = { Text("Username") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = OrangeAccent,
-                        unfocusedBorderColor = DividerVertical,
-                        focusedLabelColor = OrangeAccent,
-                        unfocusedLabelColor = SubtitleGray,
-                        cursorColor = OrangeAccent
-                    )
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (editNameField.isNotBlank()) localDisplayName = editNameField.trim()
-                        showEditUsernameDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
-                    shape = DialogButtonShape
-                ) { Text("Save", color = Color.White) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showEditUsernameDialog = false }) {
                     Text("Cancel", color = SubtitleGray)
                 }
             }
@@ -403,6 +537,18 @@ fun ProfileScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                val successTone = data.visuals.duration == SnackbarDuration.Short
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = if (successTone) SuccessSnackbarGreen else ErrorRed,
+                    contentColor = Color.White,
+                    actionColor = Color.White,
+                    actionContentColor = Color.White
+                )
+            }
+        },
         bottomBar = {
             EventPopBottomBar(
                 selectedEvents = false,
@@ -426,20 +572,16 @@ fun ProfileScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 24.dp)
         ) {
-            ProfileHeroBlock(
-                initials = initials,
-                displayName = localDisplayName,
-                email = email,
-                onEditProfile = {
-                    editNameField = localDisplayName
-                    showEditUsernameDialog = true
-                }
+            ProfileHeroAvatarBlock(
+                uiState = uiState,
+                onEditProfileClick = { showEditSheet = true },
+                onOpenAvatarOptions = { showAvatarSheet = true }
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             ProfileStatsRow(
-                rsvpCount = 0,
+                rsvpCount = rsvpCount,
                 city = city,
                 alertsOn = notificationsEnabled
             )
@@ -481,11 +623,8 @@ fun ProfileScreen(
             ProfileSectionCard {
                 ProfileRowItem(
                     icon = Icons.Outlined.PersonOutline,
-                    label = "Edit Username",
-                    onClick = {
-                        editNameField = localDisplayName
-                        showEditUsernameDialog = true
-                    }
+                    label = stringResource(R.string.profile_edit_profile_title),
+                    onClick = { showEditSheet = true }
                 )
                 ProfileRowDivider()
                 ProfileRowItem(
@@ -517,68 +656,6 @@ fun ProfileScreen(
                     onClick = { showDeleteDialog = true }
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun ProfileHeroBlock(
-    initials: String,
-    displayName: String,
-    email: String,
-    onEditProfile: () -> Unit
-) {
-    val heroShape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(220.dp)
-            .clip(heroShape)
-            .background(AppBarNavy)
-            .padding(top = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .size(88.dp)
-                .background(AppBarNavy, CircleShape)
-                .border(3.dp, OrangeAccent, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = initials,
-                color = Color.White,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Black
-            )
-        }
-        Text(
-            text = displayName,
-            color = Color.White,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 8.dp)
-        )
-        Text(
-            text = email,
-            color = Color.White.copy(alpha = 0.6f),
-            fontSize = 13.sp,
-            modifier = Modifier.padding(top = 4.dp)
-        )
-        OutlinedButton(
-            onClick = onEditProfile,
-            modifier = Modifier
-                .padding(top = 8.dp)
-                .height(32.dp),
-            shape = RoundedCornerShape(20.dp),
-            border = BorderStroke(1.dp, OrangeAccent),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = Color.Transparent,
-                contentColor = OrangeAccent
-            ),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp)
-        ) {
-            Text("Edit Profile", fontSize = 13.sp, fontWeight = FontWeight.Medium)
         }
     }
 }

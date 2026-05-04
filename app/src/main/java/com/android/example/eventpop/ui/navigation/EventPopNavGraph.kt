@@ -224,8 +224,11 @@ fun EventPopNavGraph(
                 profileViewModel.refresh()
             }
             val profileUiState by profileViewModel.uiState.collectAsState()
+            val rsvpCount by profileViewModel.rsvpCount.collectAsState()
             ProfileScreen(
                 uiState = profileUiState,
+                profileViewModel = profileViewModel,
+                rsvpCount = rsvpCount,
                 onNavEvents = navEvents,
                 onNavMap = navMap,
                 onNavDiscover = navDiscover,
@@ -245,6 +248,7 @@ fun EventPopNavGraph(
                 onLogoutConfirmed = {
                     coroutineScope.launch {
                         try {
+                            app.profileRepository.clearLocalCache()
                             AuthRepository.signOut()
                             val ctx = context
                             ctx.startActivity(

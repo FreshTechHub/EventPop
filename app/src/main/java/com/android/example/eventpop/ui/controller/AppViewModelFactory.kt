@@ -1,5 +1,6 @@
 package com.android.example.eventpop.ui.controller
 
+import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.CreationExtras
@@ -23,6 +24,7 @@ class AppViewModelFactory(
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
         val repo = app.eventRepository
+        val application = extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as Application
         return when {
             modelClass.isAssignableFrom(HomeViewModel::class.java) ->
                 HomeViewModel(repo) as T
@@ -39,7 +41,7 @@ class AppViewModelFactory(
             modelClass.isAssignableFrom(FavoritesViewModel::class.java) ->
                 FavoritesViewModel(repo) as T
             modelClass.isAssignableFrom(ProfileViewModel::class.java) ->
-                ProfileViewModel() as T
+                ProfileViewModel(application, app.profileRepository) as T
             modelClass.isAssignableFrom(CreateEventViewModel::class.java) ->
                 CreateEventViewModel(app, repo) as T
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")

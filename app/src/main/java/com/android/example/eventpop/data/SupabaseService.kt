@@ -3,6 +3,7 @@ package com.android.example.eventpop.data
 import android.util.Log
 import com.android.example.eventpop.data.remote.EventRemoteRow
 import com.android.example.eventpop.data.remote.toEvent
+import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.auth
@@ -47,6 +48,8 @@ object SupabaseService {
     } else {
         null
     }
+
+    internal fun supabaseClientOrNull(): SupabaseClient? = client
 
     val auth get() = client?.auth
     val postgrest get() = client?.postgrest
@@ -93,15 +96,25 @@ object SupabaseService {
 
     fun currentProfileSnapshot(): UserProfileSnapshot {
         val user = auth?.currentUserOrNull()
-            ?: return UserProfileSnapshot(email = null, displayName = null, isLoggedIn = false)
+            ?: return UserProfileSnapshot(email = null, displayName = null, avatarUrl = "", isLoggedIn = false)
         val meta = user.userMetadata
+        val displayMeta = meta?.get("display_name")?.let { el ->
+            (el as? JsonPrimitive)?.content
+                ?: el.toString().trim().removeSurrounding("\"")
+        }?.takeIf { it.isNotBlank() }
         val fullName = meta?.get("full_name")?.let { el ->
             (el as? JsonPrimitive)?.content
                 ?: el.toString().trim().removeSurrounding("\"")
         }?.takeIf { it.isNotBlank() }
+        val avatarUrl = meta?.get("avatar_url")?.let { el ->
+            (el as? JsonPrimitive)?.content
+                ?: el.toString().trim().removeSurrounding("\"")
+        }.orEmpty()
+        val resolvedName = displayMeta ?: fullName ?: user.email?.substringBefore("@")
         return UserProfileSnapshot(
             email = user.email,
-            displayName = fullName ?: user.email?.substringBefore("@"),
+            displayName = resolvedName,
+            avatarUrl = avatarUrl,
             isLoggedIn = true
         )
     }
@@ -434,6 +447,36 @@ object SupabaseService {
                 this.contentType = ContentType.parse(contentType)
             }
             s.from(bucketId).publicUrl(objectPath.trimStart('/'))
+        }
+    }
+
+    suspend fun deletePublicStorageObject(bucketId: String, objectPath: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            val s = storage ?: return@withContext Result.failure(
+                IllegalStateException("Supabase not configured")
+            )
+            val path = objectPath.trimStart('/')
+            runCatching {
+                s.from(bucketId).delete(listOf(path))
+            }.fold(
+                onSuccess = { Result.success(Unit) },
+                onFailure = { Result.failure(it) }
+            )
+        }
+
+    /**
+     * Count of rows in [public.event_interests] for the signed-in user (shown as “RSVPs” on profile).
+     */
+    suspend fun countCurrentUserEventInterests(): Int = withContext(Dispatchers.IO) {
+        val pg = postgrest ?: return@withContext 0
+        val uid = auth?.currentUserOrNull()?.id ?: return@withContext 0
+        try {
+            pg["event_interests"].select(columns = Columns.raw("event_id")) {
+                filter { eq("user_id", uid) }
+            }.decodeList<EventInterestIdRow>().size
+        } catch (e: Exception) {
+            Log.w("SupabaseService", "countCurrentUserEventInterests: ${e.message}")
+            0
         }
     }
 

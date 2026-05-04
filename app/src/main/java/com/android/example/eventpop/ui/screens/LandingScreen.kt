@@ -72,6 +72,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -84,6 +85,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.android.example.eventpop.EventPopApp
+import com.android.example.eventpop.MainActivity
+import com.android.example.eventpop.data.AuthRepository
+import com.android.example.eventpop.data.LocalProfile
+import com.android.example.eventpop.ui.components.AvatarComposable
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.android.example.eventpop.R
@@ -129,6 +135,10 @@ fun LandingScreen(
     val context = LocalContext.current
     val view = LocalView.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val app = remember(context.applicationContext) { context.applicationContext as EventPopApp }
+    val cachedProfile by app.profileLocalDataStore.getProfile()
+        .collectAsStateWithLifecycle(LocalProfile())
+    val sessionLoggedIn = AuthRepository.isLoggedIn()
 
     DisposableEffect(Unit) {
         val window = (context as? Activity)?.window
@@ -156,16 +166,26 @@ fun LandingScreen(
             state = listState
         ) {
             item(key = "hero") {
-                Column(Modifier.animateItemPlacement()) {
+                Column(Modifier.animateItem()) {
                     LandingHero(
                         heroImageUrl = heroImageUrl,
                         isLoading = uiState.isLoading,
-                        onSignIn = onSignIn
+                        onSignIn = onSignIn,
+                        profile = cachedProfile,
+                        isLoggedIn = sessionLoggedIn,
+                        onOpenProfile = {
+                            context.startActivity(
+                                android.content.Intent(context, MainActivity::class.java).apply {
+                                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                                        android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+                                }
+                            )
+                        }
                     )
                 }
             }
             item(key = "live") {
-                Column(Modifier.animateItemPlacement()) {
+                Column(Modifier.animateItem()) {
                     LandingLiveSection(
                         isLoading = uiState.isLoading,
                         liveEvents = uiState.liveEvents,
@@ -174,12 +194,12 @@ fun LandingScreen(
                 }
             }
             item(key = "categories") {
-                Column(Modifier.animateItemPlacement()) {
+                Column(Modifier.animateItem()) {
                     LandingCategoryRow()
                 }
             }
             item(key = "featured") {
-                Column(Modifier.animateItemPlacement()) {
+                Column(Modifier.animateItem()) {
                     LandingFeaturedSection(
                         isLoading = uiState.isLoading,
                         featured = uiState.featuredEvents,
@@ -189,7 +209,7 @@ fun LandingScreen(
                 }
             }
             item(key = "social") {
-                Column(Modifier.animateItemPlacement()) {
+                Column(Modifier.animateItem()) {
                     LandingSocialProof()
                 }
             }
@@ -209,7 +229,10 @@ fun LandingScreen(
 private fun LandingHero(
     heroImageUrl: String?,
     isLoading: Boolean,
-    onSignIn: () -> Unit
+    onSignIn: () -> Unit,
+    profile: LocalProfile,
+    isLoggedIn: Boolean,
+    onOpenProfile: () -> Unit
 ) {
     var heroAnimStarted by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -294,7 +317,7 @@ private fun LandingHero(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Image(
-                    painter = painterResource(R.mipmap.ic_launcher),
+                    painter = painterResource(R.drawable.ic_launcher_foreground),
                     contentDescription = null,
                     modifier = Modifier.size(32.dp),
                     colorFilter = ColorFilter.tint(Color.White)
@@ -306,13 +329,30 @@ private fun LandingHero(
                     fontWeight = FontWeight.Black
                 )
             }
-            TextButton(onClick = onSignIn) {
-                Text(
-                    text = stringResource(R.string.landing_sign_in),
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+            if (isLoggedIn) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onOpenProfile),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AvatarComposable(
+                        avatarUrl = profile.avatarUrl,
+                        avatarLocalPath = profile.avatarLocalPath,
+                        displayName = profile.displayName.ifBlank { "User" },
+                        size = 28.dp
+                    )
+                }
+            } else {
+                TextButton(onClick = onSignIn) {
+                    Text(
+                        text = stringResource(R.string.landing_sign_in),
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
 

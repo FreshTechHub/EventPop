@@ -225,4 +225,30 @@
     <string name="create_event_location_error_required">Please select a location for this event</string>
     <string name="location_permission_settings_hint">Enable location in Settings</string>
     <string name="location_permission_open_settings">Open Settings</string>
+
+    <!-- Profile management -->
+    <string name="profile_photo_updated">Profile photo updated</string>
+    <string name="profile_photo_saved_local">Saved locally — will sync when you\'re online</string>
+    <string name="profile_photo_upload_failed">Could not upload photo</string>
+    <string name="profile_photo_removed">Profile photo removed</string>
+    <string name="profile_photo_remove_failed">Could not remove photo</string>
+    <string name="profile_display_name_updated">Display name updated</string>
+    <string name="profile_display_name_failed">Could not update display name</string>
+    <string name="profile_verification_sent">Verification email sent</string>
+    <string name="profile_email_failed">Could not update email</string>
+    <string name="profile_sheet_photo_title">Profile Photo</string>
+    <string name="profile_take_photo">Take Photo</string>
+    <string name="profile_choose_gallery">Choose from Gallery</string>
+    <string name="profile_remove_photo">Remove Photo</string>
+    <string name="profile_cancel">Cancel</string>
+    <string name="profile_edit_profile_title">Edit Profile</string>
+    <string name="profile_display_name_label">DISPLAY NAME</string>
+    <string name="profile_email_label">EMAIL ADDRESS</string>
+    <string name="profile_placeholder_display_name">Your display name</string>
+    <string name="profile_save">Save</string>
+    <string name="profile_email_verify_hint">Verification sent to new email. Check your inbox.</string>
+    <string name="profile_snackbar_retry">Retry</string>
+    <string name="profile_remove_photo_confirm_title">Remove photo?</string>
+    <string name="profile_remove_photo_confirm_body">Your profile photo will be deleted from this device and your account.</string>
+    <string name="media_permission_rationale">Allow photo access to pick images.</string>
 </resources>

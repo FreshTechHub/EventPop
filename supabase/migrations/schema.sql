@@ -59,10 +59,12 @@ CREATE TABLE public.events (
   end_time time without time zone,
   latitude double precision,
   longitude double precision,
+  created_by uuid,
   CONSTRAINT events_pkey PRIMARY KEY (id),
   CONSTRAINT fk_events_area FOREIGN KEY (area_id) REFERENCES public.areas(id),
   CONSTRAINT fk_events_category FOREIGN KEY (category_id) REFERENCES public.categories(id),
-  CONSTRAINT fk_events_organizer FOREIGN KEY (organizer_id) REFERENCES public.profiles(id)
+  CONSTRAINT fk_events_organizer FOREIGN KEY (organizer_id) REFERENCES public.profiles(id),
+  CONSTRAINT events_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
 );
 CREATE TABLE public.profiles (
   id uuid NOT NULL,
@@ -73,6 +75,8 @@ CREATE TABLE public.profiles (
   phone text,
   created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  subscription_active boolean NOT NULL DEFAULT false,
+  subscription_expires_at timestamp with time zone,
   CONSTRAINT profiles_pkey PRIMARY KEY (id),
   CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
 );
