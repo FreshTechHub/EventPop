@@ -44,7 +44,6 @@ import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -53,8 +52,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -62,6 +61,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -71,6 +71,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -80,10 +81,13 @@ import androidx.core.view.WindowCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.android.example.eventpop.data.Event
+import com.android.example.eventpop.R
+import com.android.example.eventpop.ui.components.EventPopCenteredTopBar
 import com.android.example.eventpop.ui.mvc.FavoritesUiState
 import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.CardBackground
+import com.android.example.eventpop.ui.theme.OnAppBar
 import com.android.example.eventpop.ui.theme.FreeGreen
 import com.android.example.eventpop.ui.theme.HeartRed
 import com.android.example.eventpop.ui.theme.OrangeAccent
@@ -118,40 +122,27 @@ fun FavoritesScreen(
         }
     }
 
+    val favoritesTopBarState = rememberTopAppBarState()
+    val favoritesScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(favoritesTopBarState)
+
     Scaffold(
         containerColor = BodyBackground,
         contentColor = AppBarNavy,
         topBar = {
-            Column {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = "Favorites",
-                            color = Color.White,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 18.sp
+            EventPopCenteredTopBar(
+                title = stringResource(R.string.nav_favorites),
+                scrollBehavior = favoritesScrollBehavior,
+                actions = {
+                    IconButton(onClick = { }) {
+                        Icon(
+                            imageVector = Icons.Filled.Bookmark,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp),
+                            tint = OnAppBar
                         )
-                    },
-                    actions = {
-                        IconButton(onClick = { }) {
-                            Icon(
-                                imageVector = Icons.Filled.Bookmark,
-                                contentDescription = null,
-                                modifier = Modifier.size(22.dp),
-                                tint = Color.White
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = AppBarNavy,
-                        scrolledContainerColor = AppBarNavy
-                    ),
-                )
-                HorizontalDivider(
-                    thickness = 1.dp,
-                    color = Color.White.copy(alpha = 0.08f)
-                )
-            }
+                    }
+                }
+            )
         },
         bottomBar = {
             EventPopBottomBar(
@@ -201,6 +192,7 @@ fun FavoritesScreen(
                         .fillMaxSize()
                         .background(BodyBackground)
                         .padding(innerPadding)
+                        .nestedScroll(favoritesScrollBehavior.nestedScrollConnection)
                         .padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)

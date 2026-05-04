@@ -39,6 +39,7 @@ fun EventRemoteRow.toEvent(): Event {
         startTime = startTime,
         endTime = endTime,
         priceInfo = buildPriceInfo(isFree, price),
+        price = price,
         isFree = isFree,
         imageUrl = imageUrl?.takeIf { it.isNotBlank() },
         category = categoryEnum,
@@ -48,6 +49,7 @@ fun EventRemoteRow.toEvent(): Event {
         organizerName = null,
         isInterested = false,
         latitude = latitude,
-        longitude = longitude
+        longitude = longitude,
+        createdBy = createdBy
     )
 }

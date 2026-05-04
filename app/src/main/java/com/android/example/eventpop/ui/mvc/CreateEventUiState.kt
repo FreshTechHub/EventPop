@@ -24,10 +24,13 @@ data class CreateEventUiState(
     val subscribeGate: Boolean = false,
     val hostedCount: Int = 0,
     val subscriptionActive: Boolean = false,
-    val areas: List<NamedLookupRow> = emptyList(),
     val categories: List<NamedLookupRow> = emptyList(),
-    val selectedAreaId: String? = null,
     val selectedCategoryId: String? = null,
+    /** Free-text neighbourhood / area (stored as a new or existing [public.areas] row on publish). */
+    val areaText: String = "",
+    /** When non-null, form is editing an existing event. */
+    val editingEventId: String? = null,
+    val rsvpCountForEdit: Int = 0,
     val title: String = "",
     val description: String = "",
     val isFree: Boolean = true,

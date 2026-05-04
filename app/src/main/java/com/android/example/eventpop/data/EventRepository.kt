@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import com.android.example.eventpop.data.local.EventDao
 import com.android.example.eventpop.data.local.EventEntity
+import com.android.example.eventpop.data.EventCategory
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -69,10 +70,15 @@ class EventRepository(
     suspend fun setEventInterested(eventId: String, interested: Boolean): Boolean =
         SupabaseService.setEventInterested(eventId, interested)
 
+    /**
+     * Categories shown when hosting an event: app [EventCategory] list (synced to Supabase on publish).
+     */
+    fun createEventCategoryOptions(): List<NamedLookupRow> =
+        EventCategory.entries.map { NamedLookupRow(id = it.name, name = it.displayName) }
+
     suspend fun fetchCreateEventLookups(): Pair<List<NamedLookupRow>, List<NamedLookupRow>> {
-        val areas = SupabaseService.fetchAreasRemote()
-        val categories = SupabaseService.fetchCategoriesRemote()
-        return areas to categories
+        val categories = createEventCategoryOptions()
+        return emptyList<NamedLookupRow>() to categories
     }
 
     suspend fun fetchHostQuota(): HostEventQuota? = SupabaseService.fetchHostQuotaRemote()
@@ -89,6 +95,39 @@ class EventRepository(
         }
         return result
     }
+
+    suspend fun updateEvent(eventId: String, submission: CreateEventSubmission): Result<Event> {
+        val result = SupabaseService.updateEventRemote(eventId, submission)
+        result.onSuccess { event ->
+            val entity = EventEntity(
+                id = event.id,
+                payloadJson = EventJson.encode(event),
+                updatedAtMillis = System.currentTimeMillis()
+            )
+            eventDao.upsert(entity)
+        }
+        return result
+    }
+
+    suspend fun deleteEvent(eventId: String): Result<Unit> {
+        val result = SupabaseService.deleteEventRemote(eventId)
+        if (result.isSuccess) {
+            eventDao.deleteById(eventId)
+        }
+        return result
+    }
+
+    suspend fun fetchEventSnapshotRemote(eventId: String): Event? =
+        SupabaseService.fetchEventByIdRemote(eventId)
+
+    suspend fun fetchEventImagePathRemote(eventId: String): String? =
+        SupabaseService.fetchEventImagePathRemote(eventId)
+
+    suspend fun resolveAreaIdForSubmission(rawName: String): Result<String?> =
+        SupabaseService.resolveOrInsertAreaByName(rawName)
+
+    suspend fun resolveCategoryIdForSubmission(displayName: String): Result<String> =
+        SupabaseService.resolveOrInsertCategoryByDisplayName(displayName)
 
     /**
      * Uploads to `event-images` under `{userId}/{uuid}.ext`. Returns the **storage object path**

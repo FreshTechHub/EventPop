@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
@@ -51,15 +50,14 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,6 +65,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -91,7 +90,7 @@ import com.android.example.eventpop.EventPopApp
 import com.android.example.eventpop.R
 import com.android.example.eventpop.data.AuthRepository
 import com.android.example.eventpop.data.LocalProfile
-import com.android.example.eventpop.ui.components.AvatarComposable
+import com.android.example.eventpop.ui.components.EventPopHomeLargeTopBar
 import com.android.example.eventpop.data.Event
 import com.android.example.eventpop.data.EventCategory
 import com.android.example.eventpop.data.EventFilter
@@ -238,74 +237,24 @@ fun HomeScreen(
     val displayedEvents =
         if (quickType == null) baseEvents else baseEvents.filter { it.matchesQuickType(quickType) }
 
+    val topAppBarScrollState = rememberTopAppBarState()
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarScrollState)
+
     Scaffold(
         containerColor = BodyBackground,
         topBar = {
-            Column {
-                TopAppBar(
-                    modifier = Modifier,
-                    navigationIcon = {
-                        Box(
-                            modifier = Modifier
-                                .padding(start = 4.dp)
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .clickable(onClick = onNavProfile),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AvatarComposable(
-                                avatarUrl = localProfile.avatarUrl,
-                                avatarLocalPath = localProfile.avatarLocalPath,
-                                displayName = displayName,
-                                size = 32.dp
-                            )
-                        }
-                    },
-                    title = {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                text = stringResource(timeOfDayGreetingRes()),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.7f)
-                            )
-                            Text(
-                                text = "$displayName 👋",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    },
-                    actions = {
-                        Box(
-                            modifier = Modifier
-                                .padding(end = 8.dp)
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(OrangeAccent)
-                                .clickable(onClick = onSearchClick),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Search,
-                                contentDescription = stringResource(R.string.search_title),
-                                tint = Color.White
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = AppBarNavy,
-                        titleContentColor = Color.White,
-                        navigationIconContentColor = Color.White,
-                        actionIconContentColor = Color.White,
-                        scrolledContainerColor = AppBarNavy
-                    )
-                )
-                HorizontalDivider(
-                    thickness = 1.dp,
-                    color = Color.White.copy(alpha = 0.1f)
-                )
-            }
+            EventPopHomeLargeTopBar(
+                greeting = stringResource(timeOfDayGreetingRes()),
+                displayName = displayName,
+                scrollBehavior = scrollBehavior,
+                onProfileClick = onNavProfile,
+                profileContentDescription = stringResource(R.string.nav_profile),
+                onSearchClick = onSearchClick,
+                searchContentDescription = stringResource(R.string.search_title),
+                avatarUrl = localProfile.avatarUrl,
+                avatarLocalPath = localProfile.avatarLocalPath,
+                avatarDisplayName = displayName
+            )
         },
         bottomBar = {
             EventPopBottomBar(
@@ -326,6 +275,7 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .background(BodyBackground)
                 .padding(horizontal = 16.dp)
                 .padding(top = 16.dp),

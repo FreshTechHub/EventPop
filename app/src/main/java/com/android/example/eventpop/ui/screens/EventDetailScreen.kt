@@ -38,6 +38,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
@@ -49,6 +51,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -59,6 +62,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -136,15 +140,19 @@ fun EventDetailScreen(
     uiState: EventDetailUiState,
     onToggleInterested: () -> Unit,
     onSubmitRsvp: () -> Unit,
-    onConsumeRsvpSuccess: () -> Unit
+    onConsumeRsvpSuccess: () -> Unit,
+    onEditEvent: () -> Unit = {},
+    onDeleteEvent: () -> Unit = {}
 ) {
     val event = uiState.event
+    val isOwner = uiState.isOwner
     val isInterested = uiState.isInterested
     val rsvpSuccess = uiState.rsvpSuccess
     val rsvpLoading = uiState.rsvpLoading
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val view = LocalView.current
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     val heartColor by animateColorAsState(
         targetValue = if (isInterested) HeartRed else Color.White,
@@ -170,6 +178,29 @@ fun EventDetailScreen(
         onDispose {
             controller?.isAppearanceLightStatusBars = oldLight ?: true
         }
+    }
+
+    if (showDeleteConfirm && event != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text(stringResource(R.string.event_detail_delete_title)) },
+            text = { Text(stringResource(R.string.event_detail_delete_message, event.title)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirm = false
+                        onDeleteEvent()
+                    }
+                ) {
+                    Text(stringResource(R.string.event_detail_delete_confirm), color = HeartRed)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text(stringResource(R.string.create_event_dialog_cancel))
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -257,9 +288,12 @@ fun EventDetailScreen(
                     barBgAlpha = barBgAlpha,
                     heartColor = heartColor,
                     isInterested = isInterested,
+                    isOwner = isOwner,
                     onBack = { navController.popBackStack() },
                     onToggleInterested = onToggleInterested,
-                    onShare = { /* share */ }
+                    onShare = { /* share */ },
+                    onEditEvent = onEditEvent,
+                    onDeleteRequest = { showDeleteConfirm = true }
                 )
             } else {
                 EventDetailLoadingShimmer()
@@ -273,9 +307,12 @@ private fun EventDetailFloatingToolbar(
     barBgAlpha: Float,
     heartColor: Color,
     isInterested: Boolean,
+    isOwner: Boolean,
     onBack: () -> Unit,
     onToggleInterested: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onEditEvent: () -> Unit,
+    onDeleteRequest: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -299,6 +336,24 @@ private fun EventDetailFloatingToolbar(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (isOwner) {
+                CircularToolbarIcon(onClick = onEditEvent) {
+                    Icon(
+                        imageVector = Icons.Filled.Edit,
+                        contentDescription = stringResource(R.string.event_detail_edit),
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                CircularToolbarIcon(onClick = onDeleteRequest) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = stringResource(R.string.event_detail_delete),
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
             CircularToolbarIcon(onClick = onShare) {
                 Icon(
                     imageVector = Icons.Filled.Share,

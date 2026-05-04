@@ -21,7 +21,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -30,12 +29,11 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.SelectableChipColors
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -45,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
@@ -58,7 +57,7 @@ import com.android.example.eventpop.data.EventLocation
 import com.android.example.eventpop.data.EventType
 import com.android.example.eventpop.data.TimeRange
 import com.android.example.eventpop.ui.navigation.EventPopDestinations
-import com.android.example.eventpop.ui.theme.AppBarNavy
+import com.android.example.eventpop.ui.components.EventPopCenteredTopBar
 import com.android.example.eventpop.ui.viewmodel.FilterEventsViewModel
 import com.android.example.eventpop.ui.mappers.icon
 
@@ -77,31 +76,16 @@ fun FilterEventsScreen(
 ) {
     val filter by viewModel.filter.collectAsState()
 
+    val filterTopBarState = rememberTopAppBarState()
+    val filterScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(filterTopBarState)
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.filter_events_title),
-                        color = SectionHeaderColor,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = SectionHeaderColor
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = AppBarNavy,
-                    titleContentColor = SectionHeaderColor,
-                    navigationIconContentColor = SectionHeaderColor
-                )
+            EventPopCenteredTopBar(
+                title = stringResource(R.string.filter_events_title),
+                onBackClick = { navController.popBackStack() },
+                backContentDescription = stringResource(R.string.back),
+                scrollBehavior = filterScrollBehavior
             )
         },
         containerColor = FilterScreenBackground,
@@ -148,6 +132,7 @@ fun FilterEventsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .nestedScroll(filterScrollBehavior.nestedScrollConnection)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {

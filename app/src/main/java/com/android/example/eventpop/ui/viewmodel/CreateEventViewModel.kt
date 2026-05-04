@@ -9,9 +9,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.example.eventpop.data.AuthRepository
 import com.android.example.eventpop.data.CreateEventSubmission
+import com.android.example.eventpop.data.EventCategory
 import com.android.example.eventpop.data.EventLocationData
-import com.android.example.eventpop.data.GeoLatLon
 import com.android.example.eventpop.data.EventRepository
+import com.android.example.eventpop.data.GeoLatLon
 import com.android.example.eventpop.data.NominatimClient
 import com.android.example.eventpop.data.NominatimRateLimitException
 import com.android.example.eventpop.data.NominatimResult
@@ -31,7 +32,8 @@ import kotlinx.coroutines.launch
 
 class CreateEventViewModel(
     application: Application,
-    private val eventRepository: EventRepository
+    private val eventRepository: EventRepository,
+    private val initialEditEventId: String? = null
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(CreateEventUiState())
@@ -92,7 +94,7 @@ class CreateEventViewModel(
                     publishError = null
                 )
             }
-            val (areas, categories) = eventRepository.fetchCreateEventLookups()
+            val categories = eventRepository.createEventCategoryOptions()
             val quota = eventRepository.fetchHostQuota()
             if (quota == null) {
                 _uiState.update {
@@ -101,29 +103,96 @@ class CreateEventViewModel(
                         metaError = when {
                             !AuthRepository.isLoggedIn() ->
                                 "Sign in to create events."
-                            areas.isEmpty() && categories.isEmpty() ->
-                                "Could not load areas and categories. Check your connection."
                             else ->
                                 "Could not verify your hosting limit. Try again."
                         },
-                        areas = areas,
                         categories = categories,
                         subscribeGate = false
                     )
                 }
                 return@launch
             }
+
+            val editId = initialEditEventId?.takeIf { it.isNotBlank() && it != "new" }
+            if (editId != null) {
+                val ev = eventRepository.fetchEventSnapshotRemote(editId)
+                if (ev == null) {
+                    _uiState.update {
+                        it.copy(
+                            isLoadingMeta = false,
+                            metaError = "Could not load that event.",
+                            categories = categories,
+                            subscribeGate = false
+                        )
+                    }
+                    return@launch
+                }
+                val me = AuthRepository.currentUserId()
+                if (me == null || ev.createdBy == null || ev.createdBy != me) {
+                    _uiState.update {
+                        it.copy(
+                            isLoadingMeta = false,
+                            metaError = "You can only edit your own events.",
+                            categories = categories,
+                            subscribeGate = false
+                        )
+                    }
+                    return@launch
+                }
+                val rawPath = eventRepository.fetchEventImagePathRemote(editId)
+                val lat = ev.latitude ?: 0.3476
+                val lon = ev.longitude ?: 32.5825
+                val loc = EventLocationData(
+                    latitude = lat,
+                    longitude = lon,
+                    displayAddress = ev.location,
+                    placeName = ev.location.substringBefore(",").trim().ifEmpty { ev.title }
+                )
+                val priceTxt = when {
+                    ev.isFree -> ""
+                    ev.price != null -> {
+                        val p = ev.price!!
+                        if (p % 1.0 == 0.0) p.toLong().toString() else p.toString()
+                    }
+                    else -> ""
+                }
+                _uiState.update { prev ->
+                    prev.copy(
+                        isLoadingMeta = false,
+                        metaError = null,
+                        categories = categories,
+                        hostedCount = quota.hostedEventCount,
+                        subscriptionActive = quota.subscriptionActive,
+                        subscribeGate = false,
+                        editingEventId = editId,
+                        rsvpCountForEdit = ev.rsvpCount ?: 0,
+                        title = ev.title,
+                        description = ev.description.orEmpty(),
+                        isFree = ev.isFree,
+                        priceText = priceTxt,
+                        dateText = ev.date.orEmpty(),
+                        startTimeText = ev.startTime.orEmpty(),
+                        endTimeText = ev.endTime.orEmpty(),
+                        areaText = ev.area.orEmpty(),
+                        selectedCategoryId = ev.category.name,
+                        locationData = loc,
+                        coverStoragePath = rawPath?.takeIf { !it.startsWith("http", ignoreCase = true) },
+                        coverImageLabel = rawPath?.substringAfterLast('/'),
+                        navigateToEventId = null
+                    )
+                }
+                return@launch
+            }
+
             val gate = !quota.canCreateEvent
             _uiState.update {
                 it.copy(
                     isLoadingMeta = false,
                     metaError = null,
-                    areas = areas,
                     categories = categories,
                     hostedCount = quota.hostedEventCount,
                     subscriptionActive = quota.subscriptionActive,
                     subscribeGate = gate,
-                    selectedAreaId = it.selectedAreaId ?: areas.firstOrNull()?.id,
                     selectedCategoryId = it.selectedCategoryId ?: categories.firstOrNull()?.id
                 )
             }
@@ -137,7 +206,7 @@ class CreateEventViewModel(
     fun setDateText(value: String) = _uiState.update { it.copy(dateText = value, fieldErrors = it.fieldErrors.copy(date = null)) }
     fun setStartTimeText(value: String) = _uiState.update { it.copy(startTimeText = value, fieldErrors = it.fieldErrors.copy(time = null)) }
     fun setEndTimeText(value: String) = _uiState.update { it.copy(endTimeText = value, fieldErrors = it.fieldErrors.copy(time = null)) }
-    fun setSelectedAreaId(id: String?) = _uiState.update { it.copy(selectedAreaId = id, fieldErrors = it.fieldErrors.copy(area = null)) }
+    fun setAreaText(value: String) = _uiState.update { it.copy(areaText = value, fieldErrors = it.fieldErrors.copy(area = null)) }
     fun setSelectedCategoryId(id: String?) = _uiState.update { it.copy(selectedCategoryId = id, fieldErrors = it.fieldErrors.copy(category = null)) }
 
     fun updateLocationSearchQuery(query: String) {
@@ -264,15 +333,14 @@ class CreateEventViewModel(
 
         val title = state.title.trim()
         val description = state.description.trim()
-        val areaId = state.selectedAreaId
-        val categoryId = state.selectedCategoryId
+        val categoryKey = state.selectedCategoryId
 
         val errors = CreateEventFieldErrors(
             title = if (title.length < 3) "Enter a title (at least 3 characters)." else null,
             location = if (state.locationData == null) "Please select a location for this event" else null,
             description = if (description.length < 10) "Add a short description (at least 10 characters)." else null,
-            area = if (state.areas.isNotEmpty() && areaId.isNullOrBlank()) "Choose an area." else null,
-            category = if (state.categories.isNotEmpty() && categoryId.isNullOrBlank()) {
+            area = null,
+            category = if (state.categories.isNotEmpty() && categoryKey.isNullOrBlank()) {
                 "Choose a category."
             } else {
                 null
@@ -314,6 +382,39 @@ class CreateEventViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isPublishing = true, publishError = null) }
+
+            val areaResolved = eventRepository.resolveAreaIdForSubmission(state.areaText).getOrElse { e ->
+                _uiState.update {
+                    it.copy(isPublishing = false, publishError = humanizePublishError(e.message))
+                }
+                return@launch
+            }
+
+            val catKey = categoryKey
+            if (catKey.isNullOrBlank()) {
+                _uiState.update {
+                    it.copy(isPublishing = false, publishError = "Choose a category.")
+                }
+                return@launch
+            }
+            val catEnum = runCatching { EventCategory.valueOf(catKey) }.getOrElse {
+                _uiState.update {
+                    it.copy(isPublishing = false, publishError = "Choose a category.")
+                }
+                return@launch
+            }
+            val categoryResolved = eventRepository.resolveCategoryIdForSubmission(catEnum.displayName)
+                .getOrElse { e ->
+                    _uiState.update {
+                        it.copy(isPublishing = false, publishError = humanizePublishError(e.message))
+                    }
+                    return@launch
+                }
+
+            val imagePathOrUrl = state.coverStoragePath
+                ?: state.editingEventId?.let { eventRepository.fetchEventImagePathRemote(it) }
+                    ?.takeIf { it.isNotBlank() }
+
             val submission = CreateEventSubmission(
                 title = title,
                 location = loc.displayAddress,
@@ -323,22 +424,29 @@ class CreateEventViewModel(
                 date = state.dateText.trim().takeIf { it.isNotEmpty() },
                 startTime = normalizeTime(state.startTimeText.trim().takeIf { it.isNotEmpty() }),
                 endTime = normalizeTime(state.endTimeText.trim().takeIf { it.isNotEmpty() }),
-                areaId = areaId?.takeIf { it.isNotBlank() },
-                categoryId = categoryId?.takeIf { it.isNotBlank() },
+                areaId = areaResolved,
+                categoryId = categoryResolved,
                 latitude = loc.latitude,
                 longitude = loc.longitude,
-                imagePathOrUrl = state.coverStoragePath
+                imagePathOrUrl = imagePathOrUrl,
+                rsvpCount = state.editingEventId?.let { state.rsvpCountForEdit }
             )
-            val result = eventRepository.createEvent(submission)
-            val quotaAfter = eventRepository.fetchHostQuota()
+
+            val editId = state.editingEventId
+            val result = if (editId != null) {
+                eventRepository.updateEvent(editId, submission)
+            } else {
+                eventRepository.createEvent(submission)
+            }
+            val quotaAfter = if (editId == null) eventRepository.fetchHostQuota() else null
             _uiState.update { s ->
                 result.fold(
                     onSuccess = { event ->
                         s.copy(
                             isPublishing = false,
                             navigateToEventId = event.id,
-                            hostedCount = quotaAfter?.hostedEventCount ?: (s.hostedCount + 1),
-                            subscribeGate = quotaAfter?.canCreateEvent == false
+                            hostedCount = quotaAfter?.hostedEventCount ?: s.hostedCount,
+                            subscribeGate = quotaAfter?.let { q -> !q.canCreateEvent } ?: s.subscribeGate
                         )
                     },
                     onFailure = { e ->

@@ -2,6 +2,7 @@ package com.android.example.eventpop.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.android.example.eventpop.data.AuthRepository
 import com.android.example.eventpop.data.EventRepository
 import com.android.example.eventpop.ui.mvc.EventDetailUiState
 import kotlinx.coroutines.Job
@@ -34,7 +35,9 @@ class EventDetailViewModel(
         }
         observeJob = viewModelScope.launch {
             eventRepository.observeEvent(eventId).collect { ev ->
-                _uiState.update { it.copy(event = ev) }
+                val uid = AuthRepository.currentUserId()
+                val owner = uid != null && ev?.createdBy != null && ev.createdBy == uid
+                _uiState.update { it.copy(event = ev, isOwner = owner) }
             }
         }
         viewModelScope.launch {
@@ -71,6 +74,11 @@ class EventDetailViewModel(
 
     fun consumeRsvpSuccess() {
         _uiState.update { it.copy(rsvpSuccess = false) }
+    }
+
+    suspend fun deleteCurrentEvent(): Boolean {
+        val id = _uiState.value.event?.id ?: return false
+        return eventRepository.deleteEvent(id).isSuccess
     }
 
     override fun onCleared() {

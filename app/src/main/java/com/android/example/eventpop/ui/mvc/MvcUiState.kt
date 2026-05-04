@@ -28,6 +28,7 @@ data class DiscoverUiState(
 @Immutable
 data class EventDetailUiState(
     val event: Event? = null,
+    val isOwner: Boolean = false,
     val isInterested: Boolean = false,
     val rsvpSuccess: Boolean = false,
     val rsvpLoading: Boolean = false

@@ -16,18 +16,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.navigation.NavType
 import com.android.example.eventpop.EventPopApp
 import com.android.example.eventpop.LandingPageActivity
 import com.android.example.eventpop.R
 import com.android.example.eventpop.data.AuthRepository
 import com.android.example.eventpop.data.EventFilter
 import com.android.example.eventpop.ui.controller.AppViewModelFactory
+import com.android.example.eventpop.ui.controller.CreateEventViewModelFactory
 import com.android.example.eventpop.ui.home.HomeScreen
 import com.android.example.eventpop.ui.screens.DiscoverScreen
 import com.android.example.eventpop.ui.screens.EventDetailScreen
@@ -42,8 +43,8 @@ import com.android.example.eventpop.ui.viewmodel.EventDetailViewModel
 import com.android.example.eventpop.ui.viewmodel.FavoritesViewModel
 import com.android.example.eventpop.ui.viewmodel.HomeViewModel
 import com.android.example.eventpop.ui.viewmodel.MapViewModel
-import com.android.example.eventpop.ui.viewmodel.CreateEventViewModel
 import com.android.example.eventpop.ui.viewmodel.ProfileViewModel
+import com.android.example.eventpop.ui.viewmodel.CreateEventViewModel
 import com.android.example.eventpop.ui.viewmodel.SearchViewModel
 import kotlinx.coroutines.launch
 
@@ -56,7 +57,10 @@ object EventPopDestinations {
     const val FILTER_EVENTS = "filter_events"
     const val FILTER_RESULT_KEY = "event_filter"
     const val SEARCH = "search"
-    const val CREATE_EVENT = "create_event"
+    const val CREATE_EVENT = "create_event/{editEventId}"
+
+    fun createEventRoute(editEventId: String? = null): String =
+        if (editEventId.isNullOrBlank()) "create_event/new" else "create_event/$editEventId"
     const val EVENT_DETAIL = "event_detail/{eventId}"
     const val EVENT_DETAIL_ID_ARG = "eventId"
 
@@ -236,7 +240,7 @@ fun EventPopNavGraph(
                 onNavProfile = navProfile,
                 onCreateEvent = {
                     if (AuthRepository.isLoggedIn()) {
-                        navController.navigate(EventPopDestinations.CREATE_EVENT)
+                        navController.navigate(EventPopDestinations.createEventRoute())
                     } else {
                         Toast.makeText(
                             context,
@@ -281,7 +285,23 @@ fun EventPopNavGraph(
                 uiState = detailUiState,
                 onToggleInterested = detailViewModel::toggleInterested,
                 onSubmitRsvp = detailViewModel::submitRsvp,
-                onConsumeRsvpSuccess = detailViewModel::consumeRsvpSuccess
+                onConsumeRsvpSuccess = detailViewModel::consumeRsvpSuccess,
+                onEditEvent = {
+                    navController.navigate(EventPopDestinations.createEventRoute(eventId))
+                },
+                onDeleteEvent = {
+                    coroutineScope.launch {
+                        if (detailViewModel.deleteCurrentEvent()) {
+                            navController.popBackStack()
+                        } else {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.event_detail_delete_failed),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }
             )
         }
 
@@ -289,8 +309,20 @@ fun EventPopNavGraph(
             FilterEventsScreen(navController = navController)
         }
 
-        composable(EventPopDestinations.CREATE_EVENT) {
-            val createViewModel: CreateEventViewModel = viewModel(factory = viewModelFactory)
+        composable(
+            route = EventPopDestinations.CREATE_EVENT,
+            arguments = listOf(
+                navArgument("editEventId") {
+                    type = NavType.StringType
+                    defaultValue = "new"
+                }
+            )
+        ) { entry ->
+            val editArg = entry.arguments?.getString("editEventId")
+            val editId = editArg?.takeIf { it != "new" }
+            val app = LocalContext.current.applicationContext as EventPopApp
+            val createFactory = remember(editId) { CreateEventViewModelFactory(app, editId) }
+            val createViewModel: CreateEventViewModel = viewModel(factory = createFactory)
             CreateEventScreen(
                 navController = navController,
                 viewModel = createViewModel

@@ -28,5 +28,6 @@ data class EventRemoteRow(
     val area: EmbeddedName? = null,
     val category: EmbeddedName? = null,
     val latitude: Double? = null,
-    val longitude: Double? = null
+    val longitude: Double? = null,
+    @SerialName("created_by") val createdBy: String? = null
 )

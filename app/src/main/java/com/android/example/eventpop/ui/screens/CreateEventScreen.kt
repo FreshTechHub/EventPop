@@ -2,6 +2,8 @@
 
 package com.android.example.eventpop.ui.screens
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
@@ -34,8 +36,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
@@ -64,8 +67,9 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -75,6 +79,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -93,13 +98,15 @@ import com.android.example.eventpop.R
 import com.android.example.eventpop.data.EventLocationData
 import com.android.example.eventpop.data.NamedLookupRow
 import com.android.example.eventpop.ui.mvc.CreateEventUiState
+import com.android.example.eventpop.ui.components.EventPopCenteredTopBar
 import com.android.example.eventpop.ui.navigation.EventPopDestinations
-import com.android.example.eventpop.ui.util.MediaPickPermissions
 import com.android.example.eventpop.ui.theme.AppBarNavy
+import com.android.example.eventpop.ui.util.MediaPickPermissions
 import com.android.example.eventpop.ui.theme.CardBackground
 import com.android.example.eventpop.ui.theme.OrangeAccent
 import com.android.example.eventpop.ui.theme.SubtitleGray
 import com.android.example.eventpop.ui.viewmodel.CreateEventViewModel
+import java.util.Calendar
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.maplibre.android.geometry.LatLng
@@ -111,6 +118,21 @@ private val ErrorText = Color(0xFFB71C1C)
 private val LocationErrorRed = Color(0xFFE53935)
 private val Shadow6 = Color(0x0F000000)
 private val KampalaLatLng = LatLng(0.3476, 32.5825)
+
+@Composable
+private fun createEventFieldColors() = OutlinedTextFieldDefaults.colors(
+    unfocusedTextColor = Color.Black,
+    focusedTextColor = Color.Black,
+    disabledTextColor = Color.Black,
+    unfocusedLabelColor = Color(0xFF424242),
+    focusedLabelColor = OrangeAccent,
+    cursorColor = OrangeAccent,
+    unfocusedBorderColor = Color(0xFFBDBDBD),
+    focusedBorderColor = OrangeAccent,
+    errorBorderColor = LocationErrorRed,
+    unfocusedPlaceholderColor = SubtitleGray,
+    focusedPlaceholderColor = SubtitleGray
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -193,7 +215,7 @@ fun CreateEventScreen(
     LaunchedEffect(uiState.navigateToEventId) {
         val id = uiState.navigateToEventId ?: return@LaunchedEffect
         navController.navigate(EventPopDestinations.eventDetailRoute(id)) {
-            popUpTo(EventPopDestinations.CREATE_EVENT) { inclusive = true }
+            popUpTo(EventPopDestinations.EVENTS) { inclusive = false }
         }
         viewModel.consumeNavigateToEventId()
     }
@@ -224,28 +246,22 @@ fun CreateEventScreen(
         if (ok) pickImage.launch("image/*") else galleryPermissionLauncher.launch(perms)
     }
 
+    val createEventTopBarState = rememberTopAppBarState()
+    val createEventScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(createEventTopBarState)
+
     Scaffold(
         containerColor = BodyBackground,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(R.string.create_event_title),
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
+            EventPopCenteredTopBar(
+                title = if (uiState.editingEventId != null) {
+                    stringResource(R.string.create_event_edit_title)
+                } else {
+                    stringResource(R.string.create_event_title)
                 },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                            tint = Color.White
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppBarNavy)
+                onBackClick = { navController.popBackStack() },
+                backContentDescription = stringResource(R.string.back),
+                scrollBehavior = createEventScrollBehavior
             )
         }
     ) { innerPadding ->
@@ -307,6 +323,7 @@ fun CreateEventScreen(
                 ) {
                     CreateEventFormContent(
                         modifier = Modifier.fillMaxSize(),
+                        scrollBehavior = createEventScrollBehavior,
                         uiState = uiState,
                         onTitleChange = viewModel::setTitle,
                         onOpenLocationPicker = { showLocationSheet = true },
@@ -316,7 +333,7 @@ fun CreateEventScreen(
                         onDateChange = viewModel::setDateText,
                         onStartTimeChange = viewModel::setStartTimeText,
                         onEndTimeChange = viewModel::setEndTimeText,
-                        onAreaId = viewModel::setSelectedAreaId,
+                        onAreaTextChange = viewModel::setAreaText,
                         onCategoryId = viewModel::setSelectedCategoryId,
                         onPickImage = { launchCoverImagePicker() },
                         onRemoveImage = viewModel::clearCover,
@@ -432,9 +449,11 @@ private fun SubscribeGatePanel(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CreateEventFormContent(
     modifier: Modifier = Modifier,
+    scrollBehavior: TopAppBarScrollBehavior,
     uiState: CreateEventUiState,
     onTitleChange: (String) -> Unit,
     onOpenLocationPicker: () -> Unit,
@@ -444,7 +463,7 @@ private fun CreateEventFormContent(
     onDateChange: (String) -> Unit,
     onStartTimeChange: (String) -> Unit,
     onEndTimeChange: (String) -> Unit,
-    onAreaId: (String?) -> Unit,
+    onAreaTextChange: (String) -> Unit,
     onCategoryId: (String?) -> Unit,
     onPickImage: () -> Unit,
     onRemoveImage: () -> Unit,
@@ -452,10 +471,10 @@ private fun CreateEventFormContent(
     onDismissError: () -> Unit
 ) {
     val fe = uiState.fieldErrors
-    var showAreaPicker by remember { mutableStateOf(false) }
     var showCategoryPicker by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     val locationBringIntoView = remember { BringIntoViewRequester() }
+    val context = LocalContext.current
 
     LaunchedEffect(fe.location) {
         if (fe.location != null) {
@@ -464,34 +483,62 @@ private fun CreateEventFormContent(
         }
     }
 
-    val areaLabel = when {
-        uiState.areas.isEmpty() -> stringResource(R.string.create_event_area_placeholder_no_list)
-        else -> uiState.areas.find { it.id == uiState.selectedAreaId }?.name.orEmpty()
-    }
-    val categoryLabel = when {
-        uiState.categories.isEmpty() -> stringResource(R.string.create_event_category_placeholder_no_list)
-        else -> uiState.categories.find { it.id == uiState.selectedCategoryId }?.name.orEmpty()
+    val categoryLabel =
+        uiState.categories.find { it.id == uiState.selectedCategoryId }?.name.orEmpty()
+
+    fun calendarFromDateText(): Calendar {
+        val cal = Calendar.getInstance()
+        val t = uiState.dateText.trim()
+        if (t.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) {
+            val p = t.split("-")
+            cal.set(p[0].toInt(), p[1].toInt() - 1, p[2].toInt())
+        }
+        return cal
     }
 
-    if (showAreaPicker) {
-        SelectionListDialog(
-            title = stringResource(R.string.create_event_field_area),
-            options = uiState.areas,
-            emptyListMessage = stringResource(R.string.create_event_area_list_empty).takeIf { uiState.areas.isEmpty() },
-            onDismiss = { showAreaPicker = false },
-            onPick = { row ->
-                onAreaId(row.id)
-                showAreaPicker = false
-            }
-        )
+    fun openDatePicker() {
+        val cal = calendarFromDateText()
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                onDateChange(String.format("%04d-%02d-%02d", year, month + 1, dayOfMonth))
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
     }
+
+    fun parseTimeParts(text: String): Pair<Int, Int> {
+        val t = text.trim()
+        val m = Regex("(\\d{1,2}):(\\d{2})").find(t)
+        return if (m != null) {
+            m.groupValues[1].toInt().coerceIn(0, 23) to m.groupValues[2].toInt().coerceIn(0, 59)
+        } else {
+            18 to 0
+        }
+    }
+
+    fun openTimePicker(isStart: Boolean) {
+        val raw = if (isStart) uiState.startTimeText else uiState.endTimeText
+        val (h, min) = parseTimeParts(raw)
+        TimePickerDialog(
+            context,
+            { _, hourOfDay, minute ->
+                val s = String.format("%02d:%02d", hourOfDay, minute)
+                if (isStart) onStartTimeChange(s) else onEndTimeChange(s)
+            },
+            h,
+            min,
+            true
+        ).show()
+    }
+
     if (showCategoryPicker) {
         SelectionListDialog(
             title = stringResource(R.string.create_event_field_category),
             options = uiState.categories,
-            emptyListMessage = stringResource(R.string.create_event_category_list_empty).takeIf {
-                uiState.categories.isEmpty()
-            },
+            emptyListMessage = null,
             onDismiss = { showCategoryPicker = false },
             onPick = { row ->
                 onCategoryId(row.id)
@@ -502,6 +549,7 @@ private fun CreateEventFormContent(
 
     Column(
         modifier = modifier
+            .nestedScroll(scrollBehavior.nestedScrollConnection)
             .verticalScroll(scrollState)
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
@@ -551,11 +599,7 @@ private fun CreateEventFormContent(
                 supportingText = { fe.title?.let { Text(it) } },
                 singleLine = true,
                 shape = FieldShape,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeAccent,
-                    focusedLabelColor = OrangeAccent,
-                    cursorColor = OrangeAccent
-                )
+                colors = createEventFieldColors()
             )
             Spacer(modifier = Modifier.height(14.dp))
             EventLocationPreviewCard(
@@ -583,22 +627,24 @@ private fun CreateEventFormContent(
                 supportingText = { fe.description?.let { Text(it) } },
                 minLines = 4,
                 shape = FieldShape,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeAccent,
-                    focusedLabelColor = OrangeAccent,
-                    cursorColor = OrangeAccent
-                )
+                colors = createEventFieldColors()
             )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         SectionCard {
-            PickerOutlineField(
-                label = stringResource(R.string.create_event_field_area),
-                value = areaLabel,
-                error = fe.area,
-                onClick = { showAreaPicker = true }
+            OutlinedTextField(
+                value = uiState.areaText,
+                onValueChange = onAreaTextChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.create_event_field_area)) },
+                placeholder = { Text(stringResource(R.string.create_event_field_area_hint)) },
+                isError = fe.area != null,
+                supportingText = { fe.area?.let { Text(it) } },
+                singleLine = true,
+                shape = FieldShape,
+                colors = createEventFieldColors()
             )
             Spacer(modifier = Modifier.height(14.dp))
             PickerOutlineField(
@@ -651,11 +697,7 @@ private fun CreateEventFormContent(
                     supportingText = { fe.price?.let { Text(it) } },
                     singleLine = true,
                     shape = FieldShape,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = OrangeAccent,
-                        focusedLabelColor = OrangeAccent,
-                        cursorColor = OrangeAccent
-                    )
+                    colors = createEventFieldColors()
                 )
             }
         }
@@ -672,10 +714,13 @@ private fun CreateEventFormContent(
             )
             OutlinedTextField(
                 value = uiState.dateText,
-                onValueChange = onDateChange,
-                modifier = Modifier.fillMaxWidth(),
+                onValueChange = {},
+                readOnly = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { openDatePicker() },
                 label = { Text(stringResource(R.string.create_event_field_date)) },
-                placeholder = { Text("2026-06-15") },
+                placeholder = { Text(stringResource(R.string.create_event_field_date_tap)) },
                 isError = fe.date != null,
                 supportingText = {
                     if (fe.date != null) Text(fe.date!!)
@@ -683,40 +728,63 @@ private fun CreateEventFormContent(
                 },
                 singleLine = true,
                 shape = FieldShape,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeAccent,
-                    focusedLabelColor = OrangeAccent,
-                    cursorColor = OrangeAccent
-                )
+                trailingIcon = {
+                    IconButton(onClick = { openDatePicker() }) {
+                        Icon(
+                            Icons.Filled.CalendarToday,
+                            contentDescription = stringResource(R.string.create_event_field_date_tap),
+                            tint = OrangeAccent
+                        )
+                    }
+                },
+                colors = createEventFieldColors()
             )
             Spacer(modifier = Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = uiState.startTimeText,
-                    onValueChange = onStartTimeChange,
-                    modifier = Modifier.weight(1f),
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { openTimePicker(true) },
                     label = { Text(stringResource(R.string.create_event_field_start)) },
+                    placeholder = { Text(stringResource(R.string.create_event_field_time_tap)) },
                     isError = fe.time != null,
                     singleLine = true,
                     shape = FieldShape,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = OrangeAccent,
-                        focusedLabelColor = OrangeAccent,
-                        cursorColor = OrangeAccent
-                    )
+                    trailingIcon = {
+                        IconButton(onClick = { openTimePicker(true) }) {
+                            Icon(
+                                Icons.Filled.AccessTime,
+                                contentDescription = stringResource(R.string.create_event_field_time_tap),
+                                tint = OrangeAccent
+                            )
+                        }
+                    },
+                    colors = createEventFieldColors()
                 )
                 OutlinedTextField(
                     value = uiState.endTimeText,
-                    onValueChange = onEndTimeChange,
-                    modifier = Modifier.weight(1f),
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { openTimePicker(false) },
                     label = { Text(stringResource(R.string.create_event_field_end)) },
+                    placeholder = { Text(stringResource(R.string.create_event_field_time_tap)) },
                     singleLine = true,
                     shape = FieldShape,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = OrangeAccent,
-                        focusedLabelColor = OrangeAccent,
-                        cursorColor = OrangeAccent
-                    )
+                    trailingIcon = {
+                        IconButton(onClick = { openTimePicker(false) }) {
+                            Icon(
+                                Icons.Filled.AccessTime,
+                                contentDescription = stringResource(R.string.create_event_field_time_tap),
+                                tint = OrangeAccent
+                            )
+                        }
+                    },
+                    colors = createEventFieldColors()
                 )
             }
             if (fe.time != null) {
@@ -799,7 +867,11 @@ private fun CreateEventFormContent(
                 )
             } else {
                 Text(
-                    stringResource(R.string.create_event_publish),
+                    text = if (uiState.editingEventId != null) {
+                        stringResource(R.string.create_event_save)
+                    } else {
+                        stringResource(R.string.create_event_publish)
+                    },
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -930,11 +1002,7 @@ private fun PickerOutlineField(
                 }
             },
             shape = FieldShape,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = OrangeAccent,
-                focusedLabelColor = OrangeAccent,
-                cursorColor = OrangeAccent
-            )
+            colors = createEventFieldColors()
         )
     }
 }

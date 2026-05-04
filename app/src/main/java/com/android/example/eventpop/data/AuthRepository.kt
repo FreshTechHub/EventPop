@@ -11,6 +11,8 @@ object AuthRepository {
 
     fun isLoggedIn(): Boolean = SupabaseService.isUserLoggedIn()
 
+    fun currentUserId(): String? = SupabaseService.currentUserId()
+
     fun currentProfile(): UserProfileSnapshot = SupabaseService.currentProfileSnapshot()
 
     suspend fun signOut() {

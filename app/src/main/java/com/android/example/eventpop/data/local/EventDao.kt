@@ -25,6 +25,9 @@ interface EventDao {
     @Query("DELETE FROM cached_events")
     suspend fun deleteAll(): Int
 
+    @Query("DELETE FROM cached_events WHERE id = :id")
+    suspend fun deleteById(id: String): Int
+
     @Transaction
     suspend fun replaceAll(entities: List<EventEntity>) {
         deleteAll()

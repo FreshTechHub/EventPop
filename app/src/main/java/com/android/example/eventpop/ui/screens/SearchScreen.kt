@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,7 +18,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -25,8 +25,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.android.example.eventpop.R
+import com.android.example.eventpop.ui.components.EventPopCenteredTopBar
 import com.android.example.eventpop.ui.components.EventSummaryRow
 import com.android.example.eventpop.ui.mvc.SearchUiState
 import com.android.example.eventpop.ui.navigation.EventPopDestinations
@@ -52,34 +53,18 @@ fun SearchScreen(
     uiState: SearchUiState,
     onQueryChange: (String) -> Unit
 ) {
+    val searchTopBarState = rememberTopAppBarState()
+    val searchScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(searchTopBarState)
+
     Scaffold(
         containerColor = BodyBackground,
         topBar = {
-            Column {
-                TopAppBar(
-                    title = {
-                        Text(
-                            stringResource(R.string.search_title),
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.back),
-                                tint = Color.White
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = AppBarNavy)
-                )
-                HorizontalDivider(
-                    thickness = 1.dp,
-                    color = Color.White.copy(alpha = 0.12f)
-                )
-            }
+            EventPopCenteredTopBar(
+                title = stringResource(R.string.search_title),
+                onBackClick = { navController.popBackStack() },
+                backContentDescription = stringResource(R.string.back),
+                scrollBehavior = searchScrollBehavior
+            )
         }
     ) { innerPadding ->
         Column(
@@ -170,7 +155,9 @@ fun SearchScreen(
                 else -> {
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .nestedScroll(searchScrollBehavior.nestedScrollConnection)
                     ) {
                         items(uiState.results, key = { it.id }) { event ->
                             EventSummaryRow(

@@ -30,7 +30,7 @@ import kotlinx.serialization.json.put
 object SupabaseService {
 
     private val eventsSelectColumns = Columns.raw(
-        "*,area:areas(name),category:categories(name)"
+        "*,area:areas(name),category:categories(name),created_by"
     )
 
     private val client = if (AppConfig.isSupabaseConfigured) {
@@ -328,21 +328,7 @@ object SupabaseService {
                 return@withContext Result.failure(IllegalStateException("Not signed in"))
             }
             runCatching {
-                val body = EventInsertBody(
-                    title = submission.title.trim(),
-                    location = submission.location.trim(),
-                    isFree = submission.isFree,
-                    description = submission.description.trim().ifEmpty { " " },
-                    imageUrl = submission.imagePathOrUrl?.takeIf { it.isNotBlank() },
-                    price = submission.price?.takeIf { !submission.isFree },
-                    date = submission.date?.takeIf { it.isNotBlank() },
-                    startTime = submission.startTime?.takeIf { it.isNotBlank() },
-                    endTime = submission.endTime?.takeIf { it.isNotBlank() },
-                    areaId = submission.areaId,
-                    categoryId = submission.categoryId,
-                    latitude = submission.latitude,
-                    longitude = submission.longitude
-                )
+                val body = submission.toEventInsertBody()
                 val row = pg["events"].insert(body) {
                     select(eventsSelectColumns)
                 }.decodeSingle<EventRemoteRow>()
@@ -352,6 +338,162 @@ object SupabaseService {
                 onFailure = { Result.failure(it) }
             )
         }
+
+    suspend fun updateEventRemote(eventId: String, submission: CreateEventSubmission): Result<Event> =
+        withContext(Dispatchers.IO) {
+            val pg = postgrest ?: return@withContext Result.failure(
+                IllegalStateException("Supabase not configured")
+            )
+            if (auth?.currentUserOrNull()?.id == null) {
+                return@withContext Result.failure(IllegalStateException("Not signed in"))
+            }
+            runCatching {
+                val body = submission.toEventInsertBody()
+                val row = pg["events"].update(body) {
+                    filter { eq("id", eventId) }
+                    select(eventsSelectColumns)
+                }.decodeSingle<EventRemoteRow>()
+                row.toEvent().withResolvedStorageImage(StorageBuckets.EVENT_IMAGES)
+            }.fold(
+                onSuccess = { Result.success(it) },
+                onFailure = { Result.failure(it) }
+            )
+        }
+
+    suspend fun deleteEventRemote(eventId: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            val pg = postgrest ?: return@withContext Result.failure(
+                IllegalStateException("Supabase not configured")
+            )
+            if (auth?.currentUserOrNull()?.id == null) {
+                return@withContext Result.failure(IllegalStateException("Not signed in"))
+            }
+            runCatching {
+                pg["events"].delete {
+                    filter { eq("id", eventId) }
+                }
+            }.fold(
+                onSuccess = { Result.success(Unit) },
+                onFailure = { Result.failure(it) }
+            )
+        }
+
+    @Serializable
+    private data class NameInsertBody(val name: String)
+
+    @Serializable
+    private data class ImagePathRow(
+        @SerialName("image_url") val imageUrl: String? = null
+    )
+
+    private fun Throwable.isUniqueViolation(): Boolean {
+        val m = message.orEmpty()
+        return m.contains("23505", ignoreCase = true) ||
+            m.contains("duplicate key", ignoreCase = true) ||
+            m.contains("unique constraint", ignoreCase = true)
+    }
+
+    /**
+     * Finds an existing [public.areas] row by exact [name], or inserts one (authenticated insert policy).
+     */
+    suspend fun resolveOrInsertAreaByName(rawName: String): Result<String?> =
+        withContext(Dispatchers.IO) {
+            val pg = postgrest ?: return@withContext Result.failure(
+                IllegalStateException("Supabase not configured")
+            )
+            val name = rawName.trim()
+            if (name.isEmpty()) return@withContext Result.success(null)
+            runCatching {
+                val existing = pg["areas"].select(columns = Columns.raw("id")) {
+                    filter { eq("name", name) }
+                }.decodeList<EventIdRow>().firstOrNull()
+                if (existing != null) return@runCatching existing.id
+                try {
+                    pg["areas"].insert(NameInsertBody(name)) {
+                        select(Columns.raw("id"))
+                    }.decodeSingle<EventIdRow>().id
+                } catch (e: Exception) {
+                    if (e.isUniqueViolation()) {
+                        pg["areas"].select(columns = Columns.raw("id")) {
+                            filter { eq("name", name) }
+                        }.decodeList<EventIdRow>().firstOrNull()?.id
+                            ?: throw e
+                    } else {
+                        throw e
+                    }
+                }
+            }.fold(
+                onSuccess = { Result.success(it) },
+                onFailure = { Result.failure(it) }
+            )
+        }
+
+    /**
+     * Resolves [public.categories] id for this label (matches app [EventCategory.displayName]).
+     */
+    suspend fun resolveOrInsertCategoryByDisplayName(displayName: String): Result<String> =
+        withContext(Dispatchers.IO) {
+            val pg = postgrest ?: return@withContext Result.failure(
+                IllegalStateException("Supabase not configured")
+            )
+            val name = displayName.trim()
+            if (name.isEmpty()) {
+                return@withContext Result.failure(IllegalStateException("Category name required"))
+            }
+            runCatching {
+                val existing = pg["categories"].select(columns = Columns.raw("id")) {
+                    filter { eq("name", name) }
+                }.decodeList<EventIdRow>().firstOrNull()
+                if (existing != null) return@runCatching existing.id
+                try {
+                    pg["categories"].insert(NameInsertBody(name)) {
+                        select(Columns.raw("id"))
+                    }.decodeSingle<EventIdRow>().id
+                } catch (e: Exception) {
+                    if (e.isUniqueViolation()) {
+                        pg["categories"].select(columns = Columns.raw("id")) {
+                            filter { eq("name", name) }
+                        }.decodeList<EventIdRow>().firstOrNull()?.id
+                            ?: throw e
+                    } else {
+                        throw e
+                    }
+                }
+            }.fold(
+                onSuccess = { Result.success(it) },
+                onFailure = { Result.failure(it) }
+            )
+        }
+
+    suspend fun fetchEventImagePathRemote(eventId: String): String? = withContext(Dispatchers.IO) {
+        val pg = postgrest ?: return@withContext null
+        try {
+            pg["events"].select(columns = Columns.raw("image_url")) {
+                filter { eq("id", eventId) }
+            }.decodeList<ImagePathRow>().singleOrNull()?.imageUrl
+        } catch (e: Exception) {
+            Log.w("SupabaseService", "fetchEventImagePathRemote: ${e.message}")
+            null
+        }
+    }
+
+    private fun CreateEventSubmission.toEventInsertBody(): EventInsertBody =
+        EventInsertBody(
+            title = title.trim(),
+            location = location.trim(),
+            isFree = isFree,
+            description = description.trim().ifEmpty { " " },
+            rsvpCount = rsvpCount ?: 0,
+            imageUrl = imagePathOrUrl?.takeIf { it.isNotBlank() },
+            price = price?.takeIf { !isFree },
+            date = date?.takeIf { it.isNotBlank() },
+            startTime = startTime?.takeIf { it.isNotBlank() },
+            endTime = endTime?.takeIf { it.isNotBlank() },
+            areaId = areaId,
+            categoryId = categoryId,
+            latitude = latitude,
+            longitude = longitude
+        )
 
     private suspend fun loadEventRows(
         columns: Columns,

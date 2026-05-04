@@ -36,5 +36,7 @@ data class CreateEventSubmission(
     val latitude: Double?,
     val longitude: Double?,
     /** Storage object path or https URL; null if no image. */
-    val imagePathOrUrl: String?
+    val imagePathOrUrl: String?,
+    /** Preserved when updating an event (insert ignores). */
+    val rsvpCount: Int? = null
 )
