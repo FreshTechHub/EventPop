@@ -9,6 +9,7 @@ import com.android.example.eventpop.ui.viewmodel.DiscoverViewModel
 import com.android.example.eventpop.ui.viewmodel.EventDetailViewModel
 import com.android.example.eventpop.ui.viewmodel.FavoritesViewModel
 import com.android.example.eventpop.ui.viewmodel.HomeViewModel
+import com.android.example.eventpop.ui.viewmodel.LandingViewModel
 import com.android.example.eventpop.ui.viewmodel.MapViewModel
 import com.android.example.eventpop.ui.viewmodel.ProfileViewModel
 import com.android.example.eventpop.ui.viewmodel.SearchViewModel
@@ -25,6 +26,8 @@ class AppViewModelFactory(
         return when {
             modelClass.isAssignableFrom(HomeViewModel::class.java) ->
                 HomeViewModel(repo) as T
+            modelClass.isAssignableFrom(LandingViewModel::class.java) ->
+                LandingViewModel(repo) as T
             modelClass.isAssignableFrom(DiscoverViewModel::class.java) ->
                 DiscoverViewModel(repo) as T
             modelClass.isAssignableFrom(EventDetailViewModel::class.java) ->

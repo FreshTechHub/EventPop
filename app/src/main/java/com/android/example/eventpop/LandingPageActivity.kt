@@ -9,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -142,6 +143,7 @@ private val ugandaCities = listOf(
 class LandingPageActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         enableEdgeToEdge()
 
         // Check if this is the first launch
@@ -177,12 +179,15 @@ class LandingPageActivity : ComponentActivity() {
 
                 if (!isCheckingAuth) {
                     AuthNavGraph(
-                        onAuthenticated = {
+                        onAuthenticated = { pendingEventDetailId ->
                             startActivity(
                                 Intent(this@LandingPageActivity, MainActivity::class.java).apply {
                                     addFlags(
                                         Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                                     )
+                                    if (pendingEventDetailId != null) {
+                                        putExtra(MainActivity.EXTRA_EVENT_DETAIL_ID, pendingEventDetailId)
+                                    }
                                 }
                             )
                             finish()

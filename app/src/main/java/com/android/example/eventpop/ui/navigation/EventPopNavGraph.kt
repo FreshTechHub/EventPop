@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -68,6 +69,7 @@ object EventPopDestinations {
  */
 @Composable
 fun EventPopNavGraph(
+    initialEventDetailId: String? = null,
     navController: NavHostController = rememberNavController()
 ) {
     val context = LocalContext.current
@@ -112,6 +114,8 @@ fun EventPopNavGraph(
     val navDiscover = { navigateToTab(EventPopDestinations.DISCOVER) }
     val navFavorites = { navigateToTab(EventPopDestinations.FAVOURITES) }
     val navProfile = { navigateToTab(EventPopDestinations.PROFILE) }
+
+    var initialDetailConsumed by rememberSaveable { mutableStateOf(false) }
 
     NavHost(
         navController = navController,
@@ -288,5 +292,14 @@ fun EventPopNavGraph(
                 viewModel = createViewModel
             )
         }
+    }
+
+    LaunchedEffect(initialEventDetailId, initialDetailConsumed) {
+        if (initialDetailConsumed) return@LaunchedEffect
+        val id = initialEventDetailId ?: return@LaunchedEffect
+        navController.navigate(EventPopDestinations.eventDetailRoute(id)) {
+            launchSingleTop = true
+        }
+        initialDetailConsumed = true
     }
 }

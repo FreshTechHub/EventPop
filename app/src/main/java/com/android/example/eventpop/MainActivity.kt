@@ -14,12 +14,17 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val initialEventDetailId = intent.getStringExtra(EXTRA_EVENT_DETAIL_ID)
         setContent {
             EventPopTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    EventPopNavGraph()
+                    EventPopNavGraph(initialEventDetailId = initialEventDetailId)
                 }
             }
         }
+    }
+
+    companion object {
+        const val EXTRA_EVENT_DETAIL_ID = "com.android.example.eventpop.EXTRA_EVENT_DETAIL_ID"
     }
 }

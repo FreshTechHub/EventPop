@@ -24,6 +24,12 @@ class EventRepository(
             entity?.let { runCatching { EventJson.decode(it.payloadJson) }.getOrNull() }
         }
 
+    /**
+     * Public events list for pre-auth UI (e.g. landing). Does not require a session.
+     */
+    suspend fun fetchPublicEventsSnapshot(): List<Event>? =
+        SupabaseService.fetchEventsRemote()
+
     suspend fun refreshEvents(): Boolean {
         val remote = SupabaseService.fetchEventsRemote() ?: return false
         val now = System.currentTimeMillis()
