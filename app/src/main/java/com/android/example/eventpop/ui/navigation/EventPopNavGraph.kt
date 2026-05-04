@@ -23,6 +23,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.android.example.eventpop.EventPopApp
 import com.android.example.eventpop.LandingPageActivity
+import com.android.example.eventpop.R
 import com.android.example.eventpop.data.AuthRepository
 import com.android.example.eventpop.data.EventFilter
 import com.android.example.eventpop.ui.controller.AppViewModelFactory
@@ -32,6 +33,7 @@ import com.android.example.eventpop.ui.screens.EventDetailScreen
 import com.android.example.eventpop.ui.screens.FavoritesScreen
 import com.android.example.eventpop.ui.screens.FilterEventsScreen
 import com.android.example.eventpop.ui.screens.MapScreen
+import com.android.example.eventpop.ui.screens.CreateEventScreen
 import com.android.example.eventpop.ui.screens.ProfileScreen
 import com.android.example.eventpop.ui.screens.SearchScreen
 import com.android.example.eventpop.ui.viewmodel.DiscoverViewModel
@@ -39,6 +41,7 @@ import com.android.example.eventpop.ui.viewmodel.EventDetailViewModel
 import com.android.example.eventpop.ui.viewmodel.FavoritesViewModel
 import com.android.example.eventpop.ui.viewmodel.HomeViewModel
 import com.android.example.eventpop.ui.viewmodel.MapViewModel
+import com.android.example.eventpop.ui.viewmodel.CreateEventViewModel
 import com.android.example.eventpop.ui.viewmodel.ProfileViewModel
 import com.android.example.eventpop.ui.viewmodel.SearchViewModel
 import kotlinx.coroutines.launch
@@ -52,6 +55,7 @@ object EventPopDestinations {
     const val FILTER_EVENTS = "filter_events"
     const val FILTER_RESULT_KEY = "event_filter"
     const val SEARCH = "search"
+    const val CREATE_EVENT = "create_event"
     const val EVENT_DETAIL = "event_detail/{eventId}"
     const val EVENT_DETAIL_ID_ARG = "eventId"
 
@@ -166,6 +170,9 @@ fun EventPopNavGraph(
                 onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) },
                 uiState = discoverUiState,
                 onSearchQueryChange = discoverViewModel::setSearchQuery,
+                onSelectedCategoryChange = discoverViewModel::setSelectedCategory,
+                onSelectedDateMillisChange = discoverViewModel::setSelectedDateMillis,
+                onClearSearchAndFilters = discoverViewModel::clearSearchAndRefresh,
                 onRefresh = discoverViewModel::refresh
             )
         }
@@ -220,6 +227,17 @@ fun EventPopNavGraph(
                 onNavDiscover = navDiscover,
                 onNavFavorites = navFavorites,
                 onNavProfile = navProfile,
+                onCreateEvent = {
+                    if (AuthRepository.isLoggedIn()) {
+                        navController.navigate(EventPopDestinations.CREATE_EVENT)
+                    } else {
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.create_event_sign_in_required),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                },
                 onLogoutConfirmed = {
                     coroutineScope.launch {
                         try {
@@ -261,6 +279,14 @@ fun EventPopNavGraph(
 
         composable(EventPopDestinations.FILTER_EVENTS) {
             FilterEventsScreen(navController = navController)
+        }
+
+        composable(EventPopDestinations.CREATE_EVENT) {
+            val createViewModel: CreateEventViewModel = viewModel(factory = viewModelFactory)
+            CreateEventScreen(
+                navController = navController,
+                viewModel = createViewModel
+            )
         }
     }
 }

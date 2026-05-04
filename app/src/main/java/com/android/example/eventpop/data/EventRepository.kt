@@ -1,7 +1,10 @@
 package com.android.example.eventpop.data
 
+import android.content.Context
+import android.net.Uri
 import com.android.example.eventpop.data.local.EventDao
 import com.android.example.eventpop.data.local.EventEntity
+import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -59,4 +62,50 @@ class EventRepository(
 
     suspend fun setEventInterested(eventId: String, interested: Boolean): Boolean =
         SupabaseService.setEventInterested(eventId, interested)
+
+    suspend fun fetchCreateEventLookups(): Pair<List<NamedLookupRow>, List<NamedLookupRow>> {
+        val areas = SupabaseService.fetchAreasRemote()
+        val categories = SupabaseService.fetchCategoriesRemote()
+        return areas to categories
+    }
+
+    suspend fun fetchHostQuota(): HostEventQuota? = SupabaseService.fetchHostQuotaRemote()
+
+    suspend fun createEvent(submission: CreateEventSubmission): Result<Event> {
+        val result = SupabaseService.insertEventRemote(submission)
+        result.onSuccess { event ->
+            val entity = EventEntity(
+                id = event.id,
+                payloadJson = EventJson.encode(event),
+                updatedAtMillis = System.currentTimeMillis()
+            )
+            eventDao.upsert(entity)
+        }
+        return result
+    }
+
+    /**
+     * Uploads to `event-images` under `{userId}/{uuid}.ext`. Returns the **storage object path**
+     * to store in [public.events.image_url] (resolved to a public URL when loading events).
+     */
+    suspend fun uploadEventCover(context: Context, imageUri: Uri): Result<String> {
+        val uid = SupabaseService.currentUserId()
+            ?: return Result.failure(IllegalStateException("Not signed in"))
+        val resolver = context.contentResolver
+        val bytes = resolver.openInputStream(imageUri)?.use { it.readBytes() }
+            ?: return Result.failure(IllegalStateException("Could not read image"))
+        if (bytes.size > 5_242_880) {
+            return Result.failure(IllegalStateException("Image too large (max 5 MB)"))
+        }
+        val mime = resolver.getType(imageUri) ?: "image/jpeg"
+        val ext = when (mime) {
+            "image/png" -> "png"
+            "image/webp" -> "webp"
+            "image/gif" -> "gif"
+            else -> "jpg"
+        }
+        val path = "$uid/${UUID.randomUUID()}.$ext"
+        return SupabaseService.uploadPublicObject(StorageBuckets.EVENT_IMAGES, path, bytes, mime)
+            .map { path }
+    }
 }

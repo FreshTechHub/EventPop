@@ -89,6 +89,8 @@ object SupabaseService {
         return auth?.currentSessionOrNull() != null
     }
 
+    fun currentUserId(): String? = auth?.currentUserOrNull()?.id
+
     fun currentProfileSnapshot(): UserProfileSnapshot {
         val user = auth?.currentUserOrNull()
             ?: return UserProfileSnapshot(email = null, displayName = null, isLoggedIn = false)
@@ -201,6 +203,123 @@ object SupabaseService {
                         Result.failure(e)
                     }
                 }
+            )
+        }
+
+    @Serializable
+    private data class IdNameRow(
+        val id: String,
+        val name: String
+    )
+
+    @Serializable
+    private data class ProfileSubscriptionRemote(
+        @SerialName("subscription_active") val subscriptionActive: Boolean = false
+    )
+
+    @Serializable
+    private data class EventIdRow(val id: String)
+
+    @Serializable
+    private data class EventInsertBody(
+        val title: String,
+        val location: String,
+        @SerialName("is_free") val isFree: Boolean,
+        val description: String,
+        @SerialName("rsvp_count") val rsvpCount: Int = 0,
+        @SerialName("image_url") val imageUrl: String? = null,
+        val price: Double? = null,
+        val date: String? = null,
+        @SerialName("start_time") val startTime: String? = null,
+        @SerialName("end_time") val endTime: String? = null,
+        @SerialName("area_id") val areaId: String,
+        @SerialName("category_id") val categoryId: String,
+        val latitude: Double? = null,
+        val longitude: Double? = null
+    )
+
+    suspend fun fetchAreasRemote(): List<NamedLookupRow> = withContext(Dispatchers.IO) {
+        val pg = postgrest ?: return@withContext emptyList()
+        try {
+            pg["areas"].select(columns = Columns.raw("id,name")) {}
+                .decodeList<IdNameRow>().map { NamedLookupRow(id = it.id, name = it.name) }
+                .sortedBy { it.name }
+        } catch (e: Exception) {
+            Log.e("SupabaseService", "fetchAreasRemote: ${e.message}", e)
+            emptyList()
+        }
+    }
+
+    suspend fun fetchCategoriesRemote(): List<NamedLookupRow> = withContext(Dispatchers.IO) {
+        val pg = postgrest ?: return@withContext emptyList()
+        try {
+            pg["categories"].select(columns = Columns.raw("id,name")) {}
+                .decodeList<IdNameRow>().map { NamedLookupRow(id = it.id, name = it.name) }
+                .sortedBy { it.name }
+        } catch (e: Exception) {
+            Log.e("SupabaseService", "fetchCategoriesRemote: ${e.message}", e)
+            emptyList()
+        }
+    }
+
+    suspend fun fetchHostQuotaRemote(): HostEventQuota? = withContext(Dispatchers.IO) {
+        val pg = postgrest ?: return@withContext null
+        val uid = auth?.currentUserOrNull()?.id ?: return@withContext null
+        try {
+            val subscribed = try {
+                pg["profiles"].select(columns = Columns.raw("subscription_active")) {
+                    filter { eq("id", uid) }
+                }.decodeList<ProfileSubscriptionRemote>().singleOrNull()?.subscriptionActive == true
+            } catch (e: Exception) {
+                Log.w("SupabaseService", "fetchHostQuotaRemote profile: ${e.message}")
+                false
+            }
+            val count = try {
+                pg["events"].select(columns = Columns.raw("id")) {
+                    filter { eq("created_by", uid) }
+                }.decodeList<EventIdRow>().size
+            } catch (e: Exception) {
+                Log.e("SupabaseService", "fetchHostQuotaRemote count: ${e.message}", e)
+                return@withContext null
+            }
+            HostEventQuota(subscriptionActive = subscribed, hostedEventCount = count)
+        } catch (e: Exception) {
+            Log.e("SupabaseService", "fetchHostQuotaRemote: ${e.message}", e)
+            null
+        }
+    }
+
+    suspend fun insertEventRemote(submission: CreateEventSubmission): Result<Event> =
+        withContext(Dispatchers.IO) {
+            val pg = postgrest ?: return@withContext Result.failure(
+                IllegalStateException("Supabase not configured")
+            )
+            if (auth?.currentUserOrNull()?.id == null) {
+                return@withContext Result.failure(IllegalStateException("Not signed in"))
+            }
+            runCatching {
+                val body = EventInsertBody(
+                    title = submission.title.trim(),
+                    location = submission.location.trim(),
+                    isFree = submission.isFree,
+                    description = submission.description.trim().ifEmpty { " " },
+                    imageUrl = submission.imagePathOrUrl?.takeIf { it.isNotBlank() },
+                    price = submission.price?.takeIf { !submission.isFree },
+                    date = submission.date?.takeIf { it.isNotBlank() },
+                    startTime = submission.startTime?.takeIf { it.isNotBlank() },
+                    endTime = submission.endTime?.takeIf { it.isNotBlank() },
+                    areaId = submission.areaId,
+                    categoryId = submission.categoryId,
+                    latitude = submission.latitude,
+                    longitude = submission.longitude
+                )
+                val row = pg["events"].insert(body) {
+                    select(eventsSelectColumns)
+                }.decodeSingle<EventRemoteRow>()
+                row.toEvent().withResolvedStorageImage(StorageBuckets.EVENT_IMAGES)
+            }.fold(
+                onSuccess = { Result.success(it) },
+                onFailure = { Result.failure(it) }
             )
         }
 

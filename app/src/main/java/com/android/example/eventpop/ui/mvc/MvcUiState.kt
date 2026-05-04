@@ -18,7 +18,11 @@ data class HomeUiState(
 data class DiscoverUiState(
     val searchQuery: String = "",
     val events: List<Event> = emptyList(),
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    /** Category display name (e.g. "Music") or null when not filtering. */
+    val selectedCategory: String? = null,
+    /** Selected calendar day (UTC epoch millis) or null when not filtering. */
+    val selectedDateMillis: Long? = null
 )
 
 @Immutable

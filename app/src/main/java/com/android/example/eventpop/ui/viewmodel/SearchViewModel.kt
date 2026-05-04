@@ -33,7 +33,7 @@ class SearchViewModel(
     ) { q, cached, remote, busy ->
         SearchUiState(
             query = q,
-            results = if (q.isBlank()) cached else (remote ?: emptyList()),
+            results = if (q.isBlank()) emptyList() else (remote ?: emptyList()),
             isLoading = busy
         )
     }.stateIn(

@@ -73,6 +73,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -83,6 +84,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.LaunchedEffect
 import androidx.core.view.WindowCompat
+import com.android.example.eventpop.R
 import com.android.example.eventpop.ui.mvc.ProfileUiState
 import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.AppBarNavy
@@ -138,6 +140,7 @@ fun ProfileScreen(
     onNavDiscover: () -> Unit,
     onNavFavorites: () -> Unit,
     onNavProfile: () -> Unit,
+    onCreateEvent: () -> Unit,
     onLogoutConfirmed: () -> Unit
 ) {
     val context = LocalContext.current
@@ -487,15 +490,8 @@ fun ProfileScreen(
                 ProfileRowDivider()
                 ProfileRowItem(
                     icon = Icons.Outlined.AddCircleOutline,
-                    label = "Create Event",
-                    value = "Opens website",
-                    onClick = {
-                        val intent = Intent(
-                            Intent.ACTION_VIEW,
-                            Uri.parse("https://eventpop.app/create")
-                        )
-                        context.startActivity(intent)
-                    }
+                    label = stringResource(R.string.profile_create_event),
+                    onClick = onCreateEvent
                 )
                 ProfileRowDivider()
                 ProfileRowItem(

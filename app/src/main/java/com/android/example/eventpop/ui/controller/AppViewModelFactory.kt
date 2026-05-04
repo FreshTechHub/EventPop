@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.android.example.eventpop.EventPopApp
+import com.android.example.eventpop.ui.viewmodel.CreateEventViewModel
 import com.android.example.eventpop.ui.viewmodel.DiscoverViewModel
 import com.android.example.eventpop.ui.viewmodel.EventDetailViewModel
 import com.android.example.eventpop.ui.viewmodel.FavoritesViewModel
@@ -36,6 +37,8 @@ class AppViewModelFactory(
                 FavoritesViewModel(repo) as T
             modelClass.isAssignableFrom(ProfileViewModel::class.java) ->
                 ProfileViewModel() as T
+            modelClass.isAssignableFrom(CreateEventViewModel::class.java) ->
+                CreateEventViewModel(app, repo) as T
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }
     }

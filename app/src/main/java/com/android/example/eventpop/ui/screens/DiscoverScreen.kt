@@ -2,11 +2,10 @@ package com.android.example.eventpop.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,9 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Close
@@ -28,7 +29,6 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.TheaterComedy
-import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
@@ -36,6 +36,7 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,11 +50,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import com.android.example.eventpop.data.Event
+import com.android.example.eventpop.ui.components.EventSummaryRow
 import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.mvc.DiscoverUiState
 import com.android.example.eventpop.ui.theme.AppBarNavy
-import com.android.example.eventpop.ui.theme.SubtitleGray
+import com.android.example.eventpop.ui.theme.CardBackground
 import com.android.example.eventpop.ui.theme.OrangeAccent
+import com.android.example.eventpop.ui.theme.SubtitleGray
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,10 +68,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.android.example.eventpop.ui.theme.CardBackground
+import com.android.example.eventpop.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -80,19 +84,21 @@ private data class CategoryItem(
 )
 
 private val allCategories = listOf(
-    CategoryItem("Music", Icons.Filled.MusicNote, Color(0xFF0D9488.toInt())),
-    CategoryItem("Food", Icons.Filled.Fastfood, Color(0xFFEA580C.toInt())),
-    CategoryItem("Comedy", Icons.Filled.TheaterComedy, Color(0xFF7C3AED.toInt())),
-    CategoryItem("Art", Icons.Filled.Palette, Color(0xFFDC2626.toInt())),
-    CategoryItem("Wellness", Icons.Filled.SelfImprovement, Color(0xFF059669.toInt()))
+    CategoryItem("Music", Icons.Filled.MusicNote, Color(0xFF0D9488)),
+    CategoryItem("Food", Icons.Filled.Fastfood, Color(0xFFEA580C)),
+    CategoryItem("Comedy", Icons.Filled.TheaterComedy, Color(0xFF7C3AED)),
+    CategoryItem("Art", Icons.Filled.Palette, Color(0xFFDC2626)),
+    CategoryItem("Wellness", Icons.Filled.SelfImprovement, Color(0xFF059669))
 )
 
 private val popularSearches = listOf(
-    "Street Food", "DJ Party", "Comedy Night", "Rooftop Events",
+    "Street Food", "DJ Party", "Comedy Night", "Rooftop",
     "Free Events", "This Weekend", "Live Music", "Art Gallery"
 )
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+private val BodyBackground = Color(0xFFF4F6F9)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoverScreen(
     onNavEvents: () -> Unit,
@@ -100,35 +106,43 @@ fun DiscoverScreen(
     onNavDiscover: () -> Unit,
     onNavFavorites: () -> Unit,
     onNavProfile: () -> Unit,
-    onEventClick: (com.android.example.eventpop.data.Event) -> Unit = {},
+    onEventClick: (Event) -> Unit,
     uiState: DiscoverUiState,
     onSearchQueryChange: (String) -> Unit,
+    onSelectedCategoryChange: (String?) -> Unit,
+    onSelectedDateMillisChange: (Long?) -> Unit,
+    onClearSearchAndFilters: () -> Unit,
     onRefresh: () -> Unit
 ) {
-    var selectedCategory by remember { mutableStateOf<String?>(null) }
-    var selectedDateLabel by remember { mutableStateOf<String?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
-    var showCategorySheet by remember { mutableStateOf(false) }
+    var showCategoryPicker by remember { mutableStateOf(false) }
 
-    val datePickerState = rememberDatePickerState()
-    val events = uiState.events
-    val isLoading = uiState.isLoading
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = uiState.selectedDateMillis ?: System.currentTimeMillis()
+    )
+
+    val dateChipLabel = remember(uiState.selectedDateMillis) {
+        uiState.selectedDateMillis?.let { millis ->
+            SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(millis))
+        }
+    }
 
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        selectedDateLabel = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
-                            .format(Date(millis))
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { onSelectedDateMillisChange(it) }
+                        showDatePicker = false
                     }
-                    showDatePicker = false
-                }) { Text("OK", color = OrangeAccent) }
+                ) {
+                    Text(stringResource(R.string.discover_date_ok), color = OrangeAccent)
+                }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text("Cancel", color = SubtitleGray)
+                    Text(stringResource(R.string.discover_date_cancel), color = SubtitleGray)
                 }
             }
         ) {
@@ -136,18 +150,31 @@ fun DiscoverScreen(
         }
     }
 
+    val events = uiState.events
+    val isLoading = uiState.isLoading
+    val hasActiveFilters = uiState.searchQuery.isNotBlank() ||
+        uiState.selectedCategory != null ||
+        uiState.selectedDateMillis != null
+
     Scaffold(
+        containerColor = BodyBackground,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Discover",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppBarNavy)
-            )
+            Column {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = stringResource(R.string.discover_title),
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = AppBarNavy)
+                )
+                HorizontalDivider(
+                    thickness = 1.dp,
+                    color = Color.White.copy(alpha = 0.12f)
+                )
+            }
         },
         bottomBar = {
             EventPopBottomBar(
@@ -162,8 +189,7 @@ fun DiscoverScreen(
                 onNavFavorites = onNavFavorites,
                 onNavProfile = onNavProfile
             )
-        },
-        containerColor = MaterialTheme.colorScheme.background
+        }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
@@ -171,15 +197,14 @@ fun DiscoverScreen(
                 .padding(innerPadding),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            // Search bar
             item {
                 OutlinedTextField(
                     value = uiState.searchQuery,
                     onValueChange = onSearchQueryChange,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    placeholder = { Text("Search events, places...") },
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    placeholder = { Text(stringResource(R.string.discover_search_hint)) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Filled.Search,
@@ -190,208 +215,248 @@ fun DiscoverScreen(
                     trailingIcon = {
                         if (uiState.searchQuery.isNotEmpty()) {
                             IconButton(onClick = {
-                                onSearchQueryChange("")
-                                onRefresh()
+                                onClearSearchAndFilters()
                             }) {
                                 Icon(
                                     imageVector = Icons.Filled.Close,
-                                    contentDescription = "Clear",
+                                    contentDescription = stringResource(R.string.discover_clear_search),
                                     tint = SubtitleGray
                                 )
                             }
                         }
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = OrangeAccent,
-                        unfocusedBorderColor = AppBarNavy
+                        unfocusedBorderColor = Color(0xFFE0E0E0),
+                        focusedLabelColor = OrangeAccent,
+                        cursorColor = OrangeAccent
                     )
                 )
             }
 
-            // Filter buttons row
             item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Date button
                     FilterChip(
-                        selected = selectedDateLabel != null,
+                        selected = uiState.selectedDateMillis != null,
                         onClick = { showDatePicker = true },
                         label = {
-                            Text(selectedDateLabel ?: "Date")
+                            Text(dateChipLabel ?: stringResource(R.string.discover_filter_date))
                         },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Filled.CalendarMonth,
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         },
-                        trailingIcon = if (selectedDateLabel != null) {
-                            {
-                                Icon(
-                                    imageVector = Icons.Filled.Close,
-                                    contentDescription = "Clear date",
-                                    modifier = Modifier
-                                        .size(14.dp)
-                                        .clickable { selectedDateLabel = null }
-                                )
-                            }
-                        } else null,
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = OrangeAccent.copy(alpha = 0.2f),
+                            selectedContainerColor = OrangeAccent.copy(alpha = 0.22f),
                             selectedLabelColor = OrangeAccent,
                             selectedLeadingIconColor = OrangeAccent
                         ),
-                        shape = RoundedCornerShape(20.dp)
+                        shape = RoundedCornerShape(22.dp)
                     )
+                    if (uiState.selectedDateMillis != null) {
+                        TextButton(onClick = { onSelectedDateMillisChange(null) }) {
+                            Text(stringResource(R.string.discover_clear), color = SubtitleGray)
+                        }
+                    }
 
-                    // Category button
                     FilterChip(
-                        selected = selectedCategory != null,
-                        onClick = { showCategorySheet = true },
+                        selected = uiState.selectedCategory != null,
+                        onClick = { showCategoryPicker = !showCategoryPicker },
                         label = {
-                            Text(selectedCategory ?: "Category")
+                            Text(uiState.selectedCategory ?: stringResource(R.string.discover_filter_category))
                         },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Filled.Category,
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         },
-                        trailingIcon = if (selectedCategory != null) {
-                            {
-                                Icon(
-                                    imageVector = Icons.Filled.Close,
-                                    contentDescription = "Clear category",
-                                    modifier = Modifier
-                                        .size(14.dp)
-                                        .clickable { selectedCategory = null }
-                                )
-                            }
-                        } else null,
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = OrangeAccent.copy(alpha = 0.2f),
+                            selectedContainerColor = OrangeAccent.copy(alpha = 0.22f),
                             selectedLabelColor = OrangeAccent,
                             selectedLeadingIconColor = OrangeAccent
                         ),
-                        shape = RoundedCornerShape(20.dp)
+                        shape = RoundedCornerShape(22.dp)
                     )
+                    if (uiState.selectedCategory != null) {
+                        TextButton(
+                            onClick = {
+                                onSelectedCategoryChange(null)
+                                showCategoryPicker = false
+                            }
+                        ) {
+                            Text(stringResource(R.string.discover_clear), color = SubtitleGray)
+                        }
+                    }
                 }
             }
 
-            // Category inline picker (shown when showCategorySheet)
-            if (showCategorySheet) {
+            if (showCategoryPicker) {
                 item {
-                    Surface(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        color = CardBackground,
-                        shape = RoundedCornerShape(16.dp),
-                        tonalElevation = 2.dp
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    "Select Category",
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                IconButton(onClick = { showCategorySheet = false }) {
-                                    Icon(Icons.Filled.Close, contentDescription = "Close", tint = SubtitleGray)
-                                }
-                            }
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                allCategories.forEach { cat ->
-                                    FilterChip(
-                                        selected = selectedCategory == cat.label,
-                                        onClick = {
-                                            selectedCategory = if (selectedCategory == cat.label) null else cat.label
-                                            showCategorySheet = false
-                                        },
-                                        label = { Text(cat.label) },
-                                        leadingIcon = {
-                                            Icon(
-                                                imageVector = cat.icon,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = cat.color.copy(alpha = 0.2f),
-                                            selectedLabelColor = cat.color,
-                                            selectedLeadingIconColor = cat.color
-                                        ),
-                                        shape = RoundedCornerShape(20.dp)
+                        Surface(
+                            color = CardBackground,
+                            shape = RoundedCornerShape(18.dp),
+                            shadowElevation = 3.dp,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        stringResource(R.string.discover_pick_category),
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = AppBarNavy
                                     )
+                                    IconButton(onClick = { showCategoryPicker = false }) {
+                                        Icon(
+                                            Icons.Filled.Close,
+                                            contentDescription = stringResource(R.string.discover_close_picker),
+                                            tint = SubtitleGray
+                                        )
+                                    }
+                                }
+                                Column(
+                                    modifier = Modifier.padding(top = 8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    allCategories.chunked(2).forEach { rowCats ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            rowCats.forEach { cat ->
+                                                FilterChip(
+                                                    selected = uiState.selectedCategory == cat.label,
+                                                    onClick = {
+                                                        val next =
+                                                            if (uiState.selectedCategory == cat.label) null else cat.label
+                                                        onSelectedCategoryChange(next)
+                                                        showCategoryPicker = false
+                                                    },
+                                                    label = { Text(cat.label) },
+                                                    leadingIcon = {
+                                                        Icon(
+                                                            imageVector = cat.icon,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                    },
+                                                    colors = FilterChipDefaults.filterChipColors(
+                                                        selectedContainerColor = cat.color.copy(alpha = 0.22f),
+                                                        selectedLabelColor = cat.color,
+                                                        selectedLeadingIconColor = cat.color
+                                                    ),
+                                                    shape = RoundedCornerShape(20.dp)
+                                                )
+                                            }
+                                            if (rowCats.size == 1) {
+                                                Spacer(modifier = Modifier.weight(1f))
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
+                        Spacer(modifier = Modifier.height(6.dp))
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
                 }
             }
 
-            // Loading state
             if (isLoading) {
                 item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(28.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         CircularProgressIndicator(color = OrangeAccent)
                     }
                 }
             }
 
-            // Show search results when query is active
-            if (uiState.searchQuery.isNotEmpty() || selectedCategory != null || selectedDateLabel != null) {
+            if (hasActiveFilters) {
                 item {
                     SectionHeader(
                         icon = Icons.Filled.Search,
-                        title = "Results (${events.size})"
+                        title = stringResource(R.string.discover_results_header, events.size)
                     )
                 }
                 if (events.isEmpty() && !isLoading) {
                     item {
                         Text(
-                            text = "No events match your search.",
+                            text = stringResource(R.string.discover_no_matches),
                             color = SubtitleGray,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
                         )
                     }
                 } else {
                     items(events, key = { it.id }) { event ->
-                        DiscoverEventRow(event = event, onClick = { onEventClick(event) })
+                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
+                            EventSummaryRow(event = event, onClick = { onEventClick(event) })
+                        }
                     }
                 }
             } else {
-                // Popular Searches
                 item {
-                    SectionHeader(icon = Icons.Filled.TrendingUp, title = "Popular Searches")
+                    SectionHeader(
+                        icon = Icons.AutoMirrored.Filled.TrendingUp,
+                        title = stringResource(R.string.discover_popular_searches)
+                    )
                 }
                 item {
-                    FlowRowBlock {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         popularSearches.forEach { term ->
-                            PopularSearchChip(label = term, onClick = { onSearchQueryChange(term) })
+                            FilterChip(
+                                selected = false,
+                                onClick = { onSearchQueryChange(term) },
+                                label = {
+                                    Text(term, maxLines = 1, style = MaterialTheme.typography.labelLarge)
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = CardBackground,
+                                    labelColor = AppBarNavy
+                                ),
+                                shape = RoundedCornerShape(22.dp)
+                            )
                         }
                     }
                 }
 
-                // Categories
                 item {
-                    SectionHeader(icon = Icons.Filled.Whatshot, title = "Categories")
+                    SectionHeader(
+                        icon = Icons.Filled.Whatshot,
+                        title = stringResource(R.string.discover_browse_categories)
+                    )
                 }
                 item {
                     Column(
@@ -409,15 +474,11 @@ fun DiscoverScreen(
                                     Box(modifier = Modifier.weight(1f)) {
                                         CategoryCard(
                                             category = cat,
-                                            isSelected = selectedCategory == cat.label,
+                                            isSelected = uiState.selectedCategory == cat.label,
                                             onClick = {
-                                                selectedCategory = if (selectedCategory == cat.label) null else cat.label
-                                                if (selectedCategory != null) {
-                                                    onSearchQueryChange(selectedCategory!!)
-                                                } else {
-                                                    onSearchQueryChange("")
-                                                    onRefresh()
-                                                }
+                                                onSelectedCategoryChange(
+                                                    if (uiState.selectedCategory == cat.label) null else cat.label
+                                                )
                                             }
                                         )
                                     }
@@ -426,7 +487,29 @@ fun DiscoverScreen(
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                item {
+                    Text(
+                        text = stringResource(R.string.discover_browse_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = SubtitleGray,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+                    )
+                }
+
+                if (events.isNotEmpty() && !isLoading) {
+                    item {
+                        SectionHeader(
+                            icon = Icons.Filled.Search,
+                            title = stringResource(R.string.discover_from_feed)
+                        )
+                    }
+                    items(events.take(8), key = { it.id }) { event ->
+                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
+                            EventSummaryRow(event = event, onClick = { onEventClick(event) })
+                        }
+                    }
                 }
             }
         }
@@ -438,7 +521,7 @@ private fun SectionHeader(icon: ImageVector, title: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -446,44 +529,13 @@ private fun SectionHeader(icon: ImageVector, title: String) {
             imageVector = icon,
             contentDescription = null,
             tint = OrangeAccent,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(20.dp)
         )
         Text(
             text = title,
             fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun FlowRowBlock(content: @Composable () -> Unit) {
-    FlowRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        content()
-    }
-}
-
-@Composable
-private fun PopularSearchChip(label: String, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
-        color = CardBackground,
-        tonalElevation = 2.dp
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 13.sp
+            fontSize = 16.sp,
+            color = AppBarNavy
         )
     }
 }
@@ -494,16 +546,19 @@ private fun CategoryCard(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val bg = if (isSelected)
-        Brush.linearGradient(listOf(category.color.copy(alpha = 0.7f), category.color.copy(alpha = 0.4f)))
-    else
+    val bg = if (isSelected) {
+        Brush.linearGradient(
+            listOf(category.color.copy(alpha = 0.75f), category.color.copy(alpha = 0.45f))
+        )
+    } else {
         Brush.linearGradient(listOf(CardBackground, CardBackground))
+    }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(64.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .height(68.dp)
+            .clip(RoundedCornerShape(16.dp))
             .background(bg)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp),
@@ -515,9 +570,9 @@ private fun CategoryCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(34.dp)
                     .clip(CircleShape)
-                    .background(category.color.copy(alpha = if (isSelected) 0.6f else 0.2f)),
+                    .background(category.color.copy(alpha = if (isSelected) 0.55f else 0.18f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -530,61 +585,9 @@ private fun CategoryCard(
             Text(
                 text = category.label,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
-                fontSize = 14.sp
+                color = if (isSelected) Color.White else AppBarNavy,
+                fontSize = 15.sp
             )
-        }
-    }
-}
-
-@Composable
-private fun DiscoverEventRow(
-    event: com.android.example.eventpop.data.Event,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clickable(onClick = onClick),
-        color = CardBackground,
-        shape = RoundedCornerShape(12.dp),
-        tonalElevation = 2.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color(event.category.markerColorHex.toInt()).copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Whatshot,
-                    contentDescription = null,
-                    tint = Color(event.category.markerColorHex.toInt()),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = event.title,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = event.subtitle,
-                    fontSize = 12.sp,
-                    color = SubtitleGray
-                )
-            }
         }
     }
 }

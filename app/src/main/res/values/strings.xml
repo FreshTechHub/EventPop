@@ -55,7 +55,27 @@
     <string name="search_title">Search events</string>
     <string name="search_hint">Search by title or area</string>
     <string name="search_no_results">No events match your search.</string>
+    <string name="search_clear">Clear</string>
+    <string name="search_empty_title">Find your next night out</string>
+    <string name="search_empty_body">Type a title, area, or keyword. We search live listings from Supabase.</string>
     <string name="discover_title">Discover</string>
+    <string name="discover_search_hint">Search events, venues, or vibes</string>
+    <string name="discover_clear_search">Clear search</string>
+    <string name="discover_filter_date">Date</string>
+    <string name="discover_filter_category">Category</string>
+    <string name="discover_clear_date">Clear date</string>
+    <string name="discover_clear_category">Clear category</string>
+    <string name="discover_clear">Clear</string>
+    <string name="discover_date_ok">OK</string>
+    <string name="discover_date_cancel">Cancel</string>
+    <string name="discover_pick_category">Choose a category</string>
+    <string name="discover_close_picker">Close</string>
+    <string name="discover_results_header">Matching events (%1$d)</string>
+    <string name="discover_no_matches">Nothing matches those filters yet. Try a different day or category.</string>
+    <string name="discover_popular_searches">Popular searches</string>
+    <string name="discover_browse_categories">Browse by category</string>
+    <string name="discover_browse_hint">Use search or pick a category to narrow listings. Open the Events tab to refresh the full feed after new posts go live.</string>
+    <string name="discover_from_feed">Spotlight from your feed</string>
 
     <!-- Profile -->
     <string name="profile_title">Profile</string>
@@ -78,6 +98,41 @@
     <string name="profile_delete_account">Delete Account</string>
     <string name="profile_send_feedback">Send Feedback</string>
     <string name="profile_create_event">Create Event</string>
+    <string name="create_event_sign_in_required">Sign in to create events.</string>
+
+    <!-- Create event -->
+    <string name="create_event_title">Create event</string>
+    <string name="create_event_subtitle">Tell people what, where, and when. You can host up to two events for free — then upgrade to keep listing.</string>
+    <string name="create_event_loading">Loading…</string>
+    <string name="create_event_retry">Try again</string>
+    <string name="create_event_gate_title">You\'ve reached the free host limit</string>
+    <string name="create_event_gate_body">You already have %d published events on the free plan. Subscribe to EventPop Host to list unlimited events and get featured placement.</string>
+    <string name="create_event_gate_cta">Contact us to upgrade</string>
+    <string name="create_event_gate_back">Back to profile</string>
+    <string name="create_event_field_title">Event title</string>
+    <string name="create_event_field_location">Venue or address</string>
+    <string name="create_event_field_description">Description</string>
+    <string name="create_event_field_area">Area</string>
+    <string name="create_event_field_category">Category</string>
+    <string name="create_event_free_entry">Free entry</string>
+    <string name="create_event_free_hint">Turn off to sell tickets (UGX).</string>
+    <string name="create_event_field_price">Ticket price (UGX)</string>
+    <string name="create_event_section_schedule">Schedule</string>
+    <string name="create_event_field_date">Date (optional)</string>
+    <string name="create_event_field_date_hint">ISO format YYYY-MM-DD, or leave blank.</string>
+    <string name="create_event_field_start">Start</string>
+    <string name="create_event_field_end">End</string>
+    <string name="create_event_section_map">Map pin (optional)</string>
+    <string name="create_event_map_hint">Decimal degrees help attendees find the venue on the map.</string>
+    <string name="create_event_field_lat">Latitude</string>
+    <string name="create_event_field_lng">Longitude</string>
+    <string name="create_event_section_cover">Cover image</string>
+    <string name="create_event_pick_image">Add photo</string>
+    <string name="create_event_cover_selected">Selected: %1$s</string>
+    <string name="create_event_remove_image">Remove</string>
+    <string name="create_event_publish">Publish event</string>
+    <string name="create_event_dismiss_error">Dismiss</string>
+    <string name="create_event_dialog_cancel">Cancel</string>
 
     <!-- Auth -->
     <string name="auth_header_login_subtitle">Discover gigs &amp; happenings in Kampala</string>
