@@ -18,6 +18,5 @@
 .externalNativeBuild
 .cxx
 local.properties
-.env
 .kotlin/
 *.hprof
