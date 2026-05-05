@@ -1,6 +1,7 @@
 package com.android.example.eventpop.ui.screens
 
 import android.app.Activity
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
@@ -12,7 +13,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,6 +34,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -50,6 +55,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -58,9 +64,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -83,6 +92,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
@@ -103,6 +113,8 @@ import coil.request.ImageRequest
 import com.android.example.eventpop.R
 import com.android.example.eventpop.data.Event
 import com.android.example.eventpop.ui.components.AvatarComposable
+import com.android.example.eventpop.ui.components.InteractiveStarRating
+import com.android.example.eventpop.ui.components.ReadOnlyStarRating
 import com.android.example.eventpop.ui.mvc.EventDetailUiState
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.ContentGray
@@ -141,6 +153,11 @@ fun EventDetailScreen(
     onToggleInterested: () -> Unit,
     onSubmitRsvp: () -> Unit,
     onConsumeRsvpSuccess: () -> Unit,
+    onRatingSelected: (Int) -> Unit = {},
+    onRemoveRating: () -> Unit = {},
+    onRetryRatingSubmit: () -> Unit = {},
+    onDismissRatingError: () -> Unit = {},
+    onRequestSignIn: () -> Unit = {},
     onEditEvent: () -> Unit = {},
     onDeleteEvent: () -> Unit = {}
 ) {
@@ -153,6 +170,7 @@ fun EventDetailScreen(
     val context = LocalContext.current
     val view = LocalView.current
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    val ratingRetryLabel = stringResource(R.string.rating_error_retry)
 
     val heartColor by animateColorAsState(
         targetValue = if (isInterested) HeartRed else Color.White,
@@ -167,6 +185,19 @@ fun EventDetailScreen(
                 withDismissAction = true
             )
             onConsumeRsvpSuccess()
+        }
+    }
+
+    LaunchedEffect(uiState.ratingSubmitError) {
+        val err = uiState.ratingSubmitError ?: return@LaunchedEffect
+        when (
+            snackbarHostState.showSnackbar(
+                message = err,
+                actionLabel = ratingRetryLabel
+            )
+        ) {
+            SnackbarResult.ActionPerformed -> onRetryRatingSubmit()
+            SnackbarResult.Dismissed -> onDismissRatingError()
         }
     }
 
@@ -206,7 +237,21 @@ fun EventDetailScreen(
     Scaffold(
         modifier = Modifier.background(DetailBackground),
         containerColor = DetailBackground,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                val isRatingErr = data.visuals.actionLabel == ratingRetryLabel
+                if (isRatingErr) {
+                    Snackbar(
+                        snackbarData = data,
+                        containerColor = Color(0xFFE53935),
+                        contentColor = Color.White,
+                        actionContentColor = Color.White
+                    )
+                } else {
+                    Snackbar(snackbarData = data)
+                }
+            }
+        },
         bottomBar = {
             event?.let { ev ->
                 EventDetailBottomBar(
@@ -260,8 +305,12 @@ fun EventDetailScreen(
                         )
                     }
                     item(key = "vibe") {
-                        VibeCheckBlock(
+                        VibeCheckSection(
                             event = event,
+                            uiState = uiState,
+                            onRatingSelected = onRatingSelected,
+                            onRemoveRating = onRemoveRating,
+                            onRequestSignIn = onRequestSignIn,
                             modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp)
                         )
                     }
@@ -660,53 +709,202 @@ private fun MetaPill(
     }
 }
 
+private val RatingProgressTrack = Color(0xFFE0E0E0)
+private val RatingSectionDivider = Color(0xFFF0F0F0)
+
 @Composable
-private fun VibeCheckBlock(event: Event, modifier: Modifier = Modifier) {
+private fun RatingDistributionPlaceholder(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.widthIn(min = 100.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        for (stars in 5 downTo 1) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.rating_dist_star_n, stars),
+                    color = SubtitleGray,
+                    fontSize = 10.sp,
+                    modifier = Modifier.width(24.dp)
+                )
+                LinearProgressIndicator(
+                    progress = { 0f },
+                    modifier = Modifier
+                        .width(80.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                    color = OrangeAccent,
+                    trackColor = RatingProgressTrack,
+                    strokeCap = StrokeCap.Round
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VibeCheckSection(
+    event: Event,
+    uiState: EventDetailUiState,
+    onRatingSelected: (Int) -> Unit,
+    onRemoveRating: () -> Unit,
+    onRequestSignIn: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(event) {
+    LaunchedEffect(event.id) {
         delay(100L)
         visible = true
     }
+    val avg = event.rating ?: 0f
+    val count = event.ratingCount
+
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 12 },
         modifier = modifier
     ) {
-        val rating = event.rating ?: 0f
-        val filled = rating.toInt().coerceIn(0, 5)
         Column {
             SectionHeader(stringResource(R.string.vibe_check).uppercase())
             Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    text = "%.1f".format(rating),
-                    color = Color.White,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Column {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        repeat(5) { index ->
-                            Icon(
-                                imageVector = if (index < filled) Icons.Filled.Star else Icons.Outlined.Star,
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp),
-                                tint = if (index < filled) {
-                                    OrangeAccent
-                                } else {
-                                    ContentGray.copy(alpha = 0.3f)
-                                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (count <= 0) "—" else "%.1f".format(avg),
+                        color = AppBarNavy,
+                        fontSize = 40.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    ReadOnlyStarRating(
+                        rating = avg,
+                        ratingCount = count,
+                        starSize = 18.dp,
+                        showRatingCountLabel = false,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                    AnimatedContent(
+                        targetState = count,
+                        transitionSpec = {
+                            (slideInVertically { h -> h } + fadeIn()).togetherWith(
+                                slideOutVertically { h -> -h } + fadeOut()
+                            )
+                        },
+                        label = "ratingCountAnim"
+                    ) { c ->
+                        Text(
+                            text = stringResource(R.string.rating_count_line, c),
+                            color = SubtitleGray,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+                RatingDistributionPlaceholder()
+            }
+
+            HorizontalDivider(
+                thickness = 1.dp,
+                color = RatingSectionDivider
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            when {
+                uiState.isOwner -> {
+                    Text(
+                        text = stringResource(R.string.rating_cannot_rate_own),
+                        color = SubtitleGray,
+                        fontSize = 12.sp,
+                        fontStyle = FontStyle.Italic
+                    )
+                }
+                !uiState.isUserSignedIn -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Lock,
+                            contentDescription = null,
+                            tint = SubtitleGray,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.rating_sign_in_to_rate),
+                            color = SubtitleGray,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        TextButton(onClick = onRequestSignIn) {
+                            Text(
+                                text = stringResource(R.string.rating_sign_in_cta),
+                                color = OrangeAccent,
+                                fontSize = 13.sp
                             )
                         }
                     }
+                }
+                else -> {
                     Text(
-                        text = stringResource(R.string.rating_out_of_five, rating),
-                        color = ContentGray,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 2.dp)
+                        text = if (uiState.hasRated) {
+                            stringResource(R.string.rating_your_rating_header)
+                        } else {
+                            stringResource(R.string.rating_rate_experience)
+                        },
+                        color = AppBarNavy,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
+
+                    InteractiveStarRating(
+                        currentRating = uiState.myRating,
+                        displayRating = avg,
+                        isSubmitting = uiState.isSubmittingRating,
+                        onRatingSelected = onRatingSelected,
+                        onRemoveRating = onRemoveRating,
+                        tapToRateLabel = stringResource(R.string.rating_tap_to_rate),
+                        removeLabel = stringResource(R.string.rating_remove),
+                        yourRatedSuffix = uiState.myRating?.let { stars ->
+                            stringResource(R.string.rating_you_rated_fmt, stars)
+                        }.orEmpty(),
+                    )
+
+                    AnimatedVisibility(
+                        visible = uiState.hasRated && uiState.myRating != null,
+                        enter = fadeIn(tween(250)) + slideInVertically(tween(250)) { it / 8 },
+                        modifier = Modifier.padding(top = 12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(FreeGreen.copy(alpha = 0.1f))
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = FreeGreen,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = stringResource(R.string.rating_submitted),
+                                color = FreeGreen,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
                 }
             }
         }

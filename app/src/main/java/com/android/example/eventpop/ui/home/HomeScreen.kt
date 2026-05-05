@@ -43,7 +43,6 @@ import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TheaterComedy
 import androidx.compose.material.icons.outlined.Apps
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -91,6 +90,7 @@ import com.android.example.eventpop.R
 import com.android.example.eventpop.data.AuthRepository
 import com.android.example.eventpop.data.LocalProfile
 import com.android.example.eventpop.ui.components.EventPopHomeLargeTopBar
+import com.android.example.eventpop.ui.components.ReadOnlyStarRating
 import com.android.example.eventpop.data.Event
 import com.android.example.eventpop.data.EventCategory
 import com.android.example.eventpop.data.EventFilter
@@ -541,6 +541,32 @@ private fun HotEventCard(
                     )
                 )
         )
+        val hotRating = event.rating
+        if (hotRating != null && hotRating > 0f) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(horizontal = 6.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = null,
+                    tint = OrangeAccent,
+                    modifier = Modifier.size(10.dp)
+                )
+                Text(
+                    text = "%.1f".format(hotRating),
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
         Text(
             text = event.category.displayName.uppercase().take(5),
             style = MaterialTheme.typography.labelSmall,
@@ -765,8 +791,14 @@ private fun EventCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (event.rating != null) {
-                    StarRating(rating = event.rating)
+                val feedRating = event.rating
+                if (feedRating != null && feedRating > 0f) {
+                    ReadOnlyStarRating(
+                        rating = feedRating,
+                        ratingCount = event.ratingCount,
+                        starSize = 14.dp,
+                        showRatingCountLabel = false
+                    )
                 }
             }
             Button(
@@ -789,30 +821,3 @@ private fun EventCard(
     }
 }
 
-@Composable
-private fun StarRating(
-    rating: Float,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        val fullStars = rating.toInt().coerceIn(0, 5)
-        repeat(5) { index ->
-            Icon(
-                imageVector = if (index < fullStars) Icons.Filled.Star else Icons.Outlined.Star,
-                contentDescription = null,
-                modifier = Modifier.size(12.dp),
-                tint = if (index < fullStars) OrangeAccent else SubtitleGray.copy(alpha = 0.35f)
-            )
-        }
-        Text(
-            text = "%.1f".format(rating),
-            style = MaterialTheme.typography.labelSmall,
-            color = SubtitleGray,
-            modifier = Modifier.padding(start = 2.dp)
-        )
-    }
-}

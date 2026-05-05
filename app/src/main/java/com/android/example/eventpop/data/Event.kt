@@ -35,6 +35,7 @@ data class Event(
     val imageUrl: String? = null,
     val category: EventCategory,
     val rating: Float? = null,
+    val ratingCount: Int = 0,
     val rsvpCount: Int? = null,
     val description: String? = null,
     val organizerName: String? = null,

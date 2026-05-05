@@ -32,7 +32,7 @@ class AppViewModelFactory(
             modelClass.isAssignableFrom(DiscoverViewModel::class.java) ->
                 DiscoverViewModel(repo) as T
             modelClass.isAssignableFrom(EventDetailViewModel::class.java) ->
-                EventDetailViewModel(repo) as T
+                EventDetailViewModel(repo, app.ratingRepository) as T
             modelClass.isAssignableFrom(MapViewModel::class.java) ->
                 MapViewModel(repo) as T
             modelClass.isAssignableFrom(SearchViewModel::class.java) ->

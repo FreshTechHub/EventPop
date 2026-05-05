@@ -21,6 +21,7 @@ data class EventRemoteRow(
     @SerialName("rsvp_count") val rsvpCount: Int = 0,
     @SerialName("image_url") val imageUrl: String? = null,
     @SerialName("avg_rating") val avgRating: Double? = null,
+    @SerialName("rating_count") val ratingCount: Int? = null,
     val price: Double? = null,
     val date: String? = null,
     @SerialName("start_time") val startTime: String? = null,

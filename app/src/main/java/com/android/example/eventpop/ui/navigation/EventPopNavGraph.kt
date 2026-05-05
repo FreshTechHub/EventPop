@@ -286,6 +286,19 @@ fun EventPopNavGraph(
                 onToggleInterested = detailViewModel::toggleInterested,
                 onSubmitRsvp = detailViewModel::submitRsvp,
                 onConsumeRsvpSuccess = detailViewModel::consumeRsvpSuccess,
+                onRatingSelected = detailViewModel::onRatingSelected,
+                onRemoveRating = detailViewModel::onRemoveRating,
+                onRetryRatingSubmit = detailViewModel::onRetryRatingSubmit,
+                onDismissRatingError = detailViewModel::dismissRatingError,
+                onRequestSignIn = {
+                    context.startActivity(
+                        Intent(context, LandingPageActivity::class.java).apply {
+                            addFlags(
+                                Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            )
+                        }
+                    )
+                },
                 onEditEvent = {
                     navController.navigate(EventPopDestinations.createEventRoute(eventId))
                 },

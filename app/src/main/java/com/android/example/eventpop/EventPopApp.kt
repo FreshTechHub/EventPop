@@ -6,6 +6,8 @@ import com.android.example.eventpop.data.EventRepository
 import com.android.example.eventpop.data.ProfileLocalDataStore
 import com.android.example.eventpop.data.ProfileRepository
 import com.android.example.eventpop.data.SupabaseService
+import com.android.example.eventpop.data.repository.RatingRepository
+import com.android.example.eventpop.data.repository.RatingRepositoryImpl
 import com.android.example.eventpop.data.local.AppDatabase
 
 /**
@@ -29,6 +31,10 @@ class EventPopApp : Application() {
 
     val eventRepository: EventRepository by lazy {
         EventRepository(database.eventDao())
+    }
+
+    val ratingRepository: RatingRepository by lazy {
+        RatingRepositoryImpl(SupabaseService.supabaseClientOrNull())
     }
 
     val profileLocalDataStore: ProfileLocalDataStore by lazy {

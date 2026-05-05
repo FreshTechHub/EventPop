@@ -31,7 +31,13 @@ data class EventDetailUiState(
     val isOwner: Boolean = false,
     val isInterested: Boolean = false,
     val rsvpSuccess: Boolean = false,
-    val rsvpLoading: Boolean = false
+    val rsvpLoading: Boolean = false,
+    val myRating: Int? = null,
+    val hasRated: Boolean = false,
+    val isSubmittingRating: Boolean = false,
+    val ratingSubmitError: String? = null,
+    val isUserSignedIn: Boolean = false,
+    val ratingCount: Int = 0
 )
 
 @Immutable

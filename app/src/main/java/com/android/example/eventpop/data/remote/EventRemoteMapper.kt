@@ -44,6 +44,7 @@ fun EventRemoteRow.toEvent(): Event {
         imageUrl = imageUrl?.takeIf { it.isNotBlank() },
         category = categoryEnum,
         rating = avgRating?.toFloat(),
+        ratingCount = ratingCount ?: 0,
         rsvpCount = rsvpCount,
         description = description,
         organizerName = null,
