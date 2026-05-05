@@ -84,7 +84,6 @@ import com.android.example.eventpop.data.Event
 import com.android.example.eventpop.R
 import com.android.example.eventpop.ui.components.EventPopCenteredTopBar
 import com.android.example.eventpop.ui.mvc.FavoritesUiState
-import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.CardBackground
 import com.android.example.eventpop.ui.theme.OnAppBar
@@ -106,6 +105,7 @@ fun FavoritesScreen(
     onNavDiscover: () -> Unit,
     onNavFavorites: () -> Unit,
     onNavProfile: () -> Unit,
+    modifier: Modifier = Modifier,
     onSignIn: () -> Unit,
     onRemoveFavorite: (Event) -> Unit
 ) {
@@ -126,6 +126,7 @@ fun FavoritesScreen(
     val favoritesScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(favoritesTopBarState)
 
     Scaffold(
+        modifier = modifier,
         containerColor = BodyBackground,
         contentColor = AppBarNavy,
         topBar = {
@@ -142,20 +143,6 @@ fun FavoritesScreen(
                         )
                     }
                 }
-            )
-        },
-        bottomBar = {
-            EventPopBottomBar(
-                selectedEvents = false,
-                selectedMap = false,
-                selectedDiscover = false,
-                selectedFavorites = true,
-                selectedProfile = false,
-                onNavEvents = onNavEvents,
-                onNavMap = onNavMap,
-                onNavDiscover = onNavDiscover,
-                onNavFavorites = onNavFavorites,
-                onNavProfile = onNavProfile
             )
         }
     ) { innerPadding ->

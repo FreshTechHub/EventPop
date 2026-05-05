@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -83,7 +82,6 @@ import coil.request.ImageRequest
 import com.android.example.eventpop.data.Event
 import com.android.example.eventpop.data.EventCategory
 import com.android.example.eventpop.ui.mvc.MapUiState
-import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.CardBackground
 import com.android.example.eventpop.ui.theme.FreeGreen
@@ -121,11 +119,7 @@ private class MapListenerBridge {
 @Composable
 fun MapScreen(
     uiState: MapUiState,
-    onNavEvents: () -> Unit,
-    onNavMap: () -> Unit,
-    onNavDiscover: () -> Unit,
-    onNavFavorites: () -> Unit,
-    onNavProfile: () -> Unit
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -194,7 +188,7 @@ fun MapScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
         if (LocalInspectionMode.current) {
             Box(
                 modifier = Modifier
@@ -591,27 +585,6 @@ fun MapScreen(
             }
         }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .shadow(8.dp, RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp), ambientColor = Shadow15, spotColor = Shadow15)
-                .background(AppBarNavy.copy(alpha = 0.95f))
-        ) {
-            EventPopBottomBar(
-                selectedEvents = false,
-                selectedMap = true,
-                selectedDiscover = false,
-                selectedFavorites = false,
-                selectedProfile = false,
-                onNavEvents = onNavEvents,
-                onNavMap = onNavMap,
-                onNavDiscover = onNavDiscover,
-                onNavFavorites = onNavFavorites,
-                onNavProfile = onNavProfile
-            )
-        }
     }
 }
 

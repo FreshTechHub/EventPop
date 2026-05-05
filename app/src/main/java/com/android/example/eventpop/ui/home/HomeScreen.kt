@@ -97,7 +97,6 @@ import com.android.example.eventpop.data.EventFilter
 import com.android.example.eventpop.data.EventLocation
 import com.android.example.eventpop.data.EventType
 import com.android.example.eventpop.data.TimeRange
-import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.CardBackground
 import com.android.example.eventpop.ui.theme.OrangeAccent
@@ -214,11 +213,7 @@ fun HomeScreen(
     onNavDiscover: () -> Unit = {},
     onNavFavorites: () -> Unit = {},
     onNavProfile: () -> Unit = {},
-    selectedEvents: Boolean = true,
-    selectedMap: Boolean = false,
-    selectedDiscover: Boolean = false,
-    selectedFavorites: Boolean = false,
-    selectedProfile: Boolean = false
+    modifier: Modifier = Modifier
 ) {
     val ctx = LocalContext.current
     val app = remember(ctx.applicationContext) { ctx.applicationContext as EventPopApp }
@@ -241,6 +236,7 @@ fun HomeScreen(
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarScrollState)
 
     Scaffold(
+        modifier = modifier,
         containerColor = BodyBackground,
         topBar = {
             EventPopHomeLargeTopBar(
@@ -254,20 +250,6 @@ fun HomeScreen(
                 avatarUrl = localProfile.avatarUrl,
                 avatarLocalPath = localProfile.avatarLocalPath,
                 avatarDisplayName = displayName
-            )
-        },
-        bottomBar = {
-            EventPopBottomBar(
-                selectedEvents = selectedEvents,
-                selectedMap = selectedMap,
-                selectedDiscover = selectedDiscover,
-                selectedFavorites = selectedFavorites,
-                selectedProfile = selectedProfile,
-                onNavEvents = onNavEvents,
-                onNavMap = onNavMap,
-                onNavDiscover = onNavDiscover,
-                onNavFavorites = onNavFavorites,
-                onNavProfile = onNavProfile
             )
         }
     ) { innerPadding ->

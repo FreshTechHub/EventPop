@@ -104,7 +104,6 @@ import com.yalantis.ucrop.UCrop
 import kotlinx.coroutines.launch
 import java.io.File
 import com.android.example.eventpop.ui.mvc.ProfileUiState
-import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.CardBackground
 import com.android.example.eventpop.ui.theme.OrangeAccent
@@ -156,11 +155,7 @@ fun ProfileScreen(
     uiState: ProfileUiState,
     profileViewModel: ProfileViewModel,
     rsvpCount: Int,
-    onNavEvents: () -> Unit,
-    onNavMap: () -> Unit,
-    onNavDiscover: () -> Unit,
-    onNavFavorites: () -> Unit,
-    onNavProfile: () -> Unit,
+    modifier: Modifier = Modifier,
     onCreateEvent: () -> Unit,
     onLogoutConfirmed: () -> Unit
 ) {
@@ -534,7 +529,7 @@ fun ProfileScreen(
     }
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = {
             SnackbarHost(hostState = snackbarHostState) { data ->
@@ -547,20 +542,6 @@ fun ProfileScreen(
                     actionContentColor = Color.White
                 )
             }
-        },
-        bottomBar = {
-            EventPopBottomBar(
-                selectedEvents = false,
-                selectedMap = false,
-                selectedDiscover = false,
-                selectedFavorites = false,
-                selectedProfile = true,
-                onNavEvents = onNavEvents,
-                onNavMap = onNavMap,
-                onNavDiscover = onNavDiscover,
-                onNavFavorites = onNavFavorites,
-                onNavProfile = onNavProfile
-            )
         }
     ) { innerPadding ->
         Column(

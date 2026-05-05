@@ -51,7 +51,6 @@ import androidx.compose.material3.rememberTopAppBarState
 import com.android.example.eventpop.data.Event
 import com.android.example.eventpop.ui.components.EventPopCenteredTopBar
 import com.android.example.eventpop.ui.components.EventSummaryRow
-import com.android.example.eventpop.ui.navigation.EventPopBottomBar
 import com.android.example.eventpop.ui.mvc.DiscoverUiState
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.CardBackground
@@ -107,6 +106,7 @@ fun DiscoverScreen(
     onNavDiscover: () -> Unit,
     onNavFavorites: () -> Unit,
     onNavProfile: () -> Unit,
+    modifier: Modifier = Modifier,
     onEventClick: (Event) -> Unit,
     uiState: DiscoverUiState,
     onSearchQueryChange: (String) -> Unit,
@@ -161,25 +161,12 @@ fun DiscoverScreen(
     val discoverScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(discoverTopBarState)
 
     Scaffold(
+        modifier = modifier,
         containerColor = BodyBackground,
         topBar = {
             EventPopCenteredTopBar(
                 title = stringResource(R.string.discover_title),
                 scrollBehavior = discoverScrollBehavior
-            )
-        },
-        bottomBar = {
-            EventPopBottomBar(
-                selectedEvents = false,
-                selectedMap = false,
-                selectedDiscover = true,
-                selectedFavorites = false,
-                selectedProfile = false,
-                onNavEvents = onNavEvents,
-                onNavMap = onNavMap,
-                onNavDiscover = onNavDiscover,
-                onNavFavorites = onNavFavorites,
-                onNavProfile = onNavProfile
             )
         }
     ) { innerPadding ->

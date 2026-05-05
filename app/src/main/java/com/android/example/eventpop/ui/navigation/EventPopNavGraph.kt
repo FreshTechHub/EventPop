@@ -3,17 +3,29 @@ package com.android.example.eventpop.ui.navigation
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.EaseOutQuart
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -118,13 +130,50 @@ fun EventPopNavGraph(
     val navDiscover = { navigateToTab(EventPopDestinations.DISCOVER) }
     val navFavorites = { navigateToTab(EventPopDestinations.FAVOURITES) }
     val navProfile = { navigateToTab(EventPopDestinations.PROFILE) }
+    val shouldShowBottomBar by remember(currentRoute) {
+        derivedStateOf {
+            currentRoute in setOf(
+                EventPopDestinations.EVENTS,
+                EventPopDestinations.MAP,
+                EventPopDestinations.DISCOVER,
+                EventPopDestinations.FAVOURITES,
+                EventPopDestinations.PROFILE
+            )
+        }
+    }
 
     var initialDetailConsumed by rememberSaveable { mutableStateOf(false) }
 
-    NavHost(
-        navController = navController,
-        startDestination = EventPopDestinations.EVENTS
-    ) {
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        bottomBar = {
+            AnimatedVisibility(
+                visible = shouldShowBottomBar,
+                enter = slideInVertically(
+                    initialOffsetY = { it },
+                    animationSpec = tween(durationMillis = 300, easing = EaseOutQuart)
+                ) + fadeIn(animationSpec = tween(300)),
+                exit = slideOutVertically(
+                    targetOffsetY = { it },
+                    animationSpec = tween(200)
+                ) + fadeOut(animationSpec = tween(200))
+            ) {
+                EventPopBottomBar(
+                    navController = navController,
+                    onNavEvents = navEvents,
+                    onNavMap = navMap,
+                    onNavDiscover = navDiscover,
+                    onNavFavorites = navFavorites,
+                    onNavProfile = navProfile
+                )
+            }
+        }
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = EventPopDestinations.EVENTS
+        ) {
         composable(EventPopDestinations.EVENTS) {
             val eventsBackStackEntry = navController.getBackStackEntry(EventPopDestinations.EVENTS)
             val filterResult by eventsBackStackEntry.savedStateHandle
@@ -134,13 +183,9 @@ fun EventPopNavGraph(
             val homeUiState by homeViewModel.uiState.collectAsState()
             HomeScreen(
                 uiState = homeUiState,
+                modifier = Modifier.padding(innerPadding),
                 onFilterClick = { navController.navigate(EventPopDestinations.FILTER_EVENTS) },
                 currentFilter = filterResult,
-                selectedEvents = true,
-                selectedMap = false,
-                selectedDiscover = false,
-                selectedFavorites = false,
-                selectedProfile = false,
                 onNavEvents = navEvents,
                 onNavMap = navMap,
                 onNavDiscover = navDiscover,
@@ -158,11 +203,7 @@ fun EventPopNavGraph(
             val mapUiState by mapViewModel.uiState.collectAsState()
             MapScreen(
                 uiState = mapUiState,
-                onNavEvents = navEvents,
-                onNavMap = navMap,
-                onNavDiscover = navDiscover,
-                onNavFavorites = navFavorites,
-                onNavProfile = navProfile
+                modifier = Modifier.padding(innerPadding)
             )
         }
 
@@ -170,6 +211,7 @@ fun EventPopNavGraph(
             val discoverViewModel: DiscoverViewModel = viewModel(factory = viewModelFactory)
             val discoverUiState by discoverViewModel.uiState.collectAsState()
             DiscoverScreen(
+                modifier = Modifier.padding(innerPadding),
                 onNavEvents = navEvents,
                 onNavMap = navMap,
                 onNavDiscover = navDiscover,
@@ -193,6 +235,7 @@ fun EventPopNavGraph(
             val favoritesUiState by favoritesViewModel.uiState.collectAsState()
             FavoritesScreen(
                 uiState = favoritesUiState,
+                modifier = Modifier.padding(innerPadding),
                 onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) },
                 onNavEvents = navEvents,
                 onNavMap = navMap,
@@ -233,11 +276,7 @@ fun EventPopNavGraph(
                 uiState = profileUiState,
                 profileViewModel = profileViewModel,
                 rsvpCount = rsvpCount,
-                onNavEvents = navEvents,
-                onNavMap = navMap,
-                onNavDiscover = navDiscover,
-                onNavFavorites = navFavorites,
-                onNavProfile = navProfile,
+                modifier = Modifier.padding(innerPadding),
                 onCreateEvent = {
                     if (AuthRepository.isLoggedIn()) {
                         navController.navigate(EventPopDestinations.createEventRoute())
@@ -341,7 +380,7 @@ fun EventPopNavGraph(
                 viewModel = createViewModel
             )
         }
-    }
+    } }
 
     LaunchedEffect(initialEventDetailId, initialDetailConsumed) {
         if (initialDetailConsumed) return@LaunchedEffect
