@@ -315,8 +315,7 @@ fun ProfileScreen(
         initialDisplayName = uiState.displayName,
         initialEmail = uiState.email,
         onDismiss = { showEditSheet = false },
-        onSaveDisplayName = profileViewModel::onUpdateDisplayName,
-        onSaveEmail = profileViewModel::onUpdateEmail
+        onSaveDisplayName = profileViewModel::onUpdateDisplayName
     )
 
     if (showRemoveAvatarConfirm) {

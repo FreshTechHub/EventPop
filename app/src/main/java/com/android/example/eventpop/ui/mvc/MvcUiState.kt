@@ -63,8 +63,6 @@ data class ProfileUiState(
     val avatarLocalPath: String = "",
     val isUploadingAvatar: Boolean = false,
     val isUpdatingName: Boolean = false,
-    val isUpdatingEmail: Boolean = false,
-    val emailUpdatePending: Boolean = false,
     val avatarUploadProgress: Float = 0f,
     val successMessage: String? = null,
     val errorMessage: String? = null,

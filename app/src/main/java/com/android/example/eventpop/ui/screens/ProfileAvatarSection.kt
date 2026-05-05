@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.outlined.CameraAlt
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -315,12 +314,10 @@ fun EditProfileBottomSheet(
     initialDisplayName: String,
     initialEmail: String,
     onDismiss: () -> Unit,
-    onSaveDisplayName: (String) -> Unit,
-    onSaveEmail: (String) -> Unit
+    onSaveDisplayName: (String) -> Unit
 ) {
     if (!visible) return
     var localName by remember(visible, initialDisplayName) { mutableStateOf(initialDisplayName) }
-    var localEmail by remember(visible, initialEmail) { mutableStateOf(initialEmail) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -389,49 +386,35 @@ fun EditProfileBottomSheet(
             Spacer(Modifier.height(16.dp))
             ProfileEditorLabel(stringResource(R.string.profile_email_label))
             OutlinedTextField(
-                value = localEmail,
-                onValueChange = { localEmail = it },
+                value = initialEmail,
+                onValueChange = { },
                 modifier = Modifier.fillMaxWidth(),
+                readOnly = true,
                 leadingIcon = {
                     Icon(Icons.Filled.Email, contentDescription = null, tint = SubtitleGray, modifier = Modifier.size(20.dp))
                 },
-                trailingIcon = if (localEmail.isNotBlank() && localEmail.trim() != initialEmail.trim()) {
-                    {
-                        IconButton(onClick = { onSaveEmail(localEmail.trim()) }, enabled = !uiState.isUpdatingEmail) {
-                            if (uiState.isUpdatingEmail) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = OrangeAccent, strokeWidth = 2.dp)
-                            } else {
-                                Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(20.dp))
-                            }
-                        }
-                    }
-                } else null,
+                supportingText = {
+                    Text(
+                        stringResource(R.string.profile_email_readonly_hint),
+                        fontSize = 12.sp,
+                        color = SubtitleGray
+                    )
+                },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeAccent,
+                    focusedBorderColor = FieldBorderIdle,
                     unfocusedBorderColor = FieldBorderIdle,
+                    disabledBorderColor = FieldBorderIdle,
                     focusedContainerColor = CardBackground,
                     unfocusedContainerColor = CardBackground,
+                    disabledContainerColor = CardBackground,
+                    disabledTextColor = AppBarNavy,
+                    disabledLeadingIconColor = SubtitleGray,
                     cursorColor = OrangeAccent
                 )
             )
-            if (uiState.emailUpdatePending) {
-                Row(
-                    modifier = Modifier.padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Outlined.Info, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(16.dp))
-                    Text(
-                        stringResource(R.string.profile_email_verify_hint),
-                        fontSize = 12.sp,
-                        color = SubtitleGray,
-                        modifier = Modifier.padding(start = 6.dp)
-                    )
-                }
-            }
             Spacer(Modifier.height(24.dp))
         }
     }

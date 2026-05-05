@@ -207,40 +207,6 @@ class ProfileViewModel(
         }
     }
 
-    fun onUpdateEmail(email: String) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isUpdatingEmail = true, errorMessage = null, successMessage = null) }
-            profileRepository.updateEmail(email).fold(
-                onSuccess = {
-                    _uiState.update {
-                        it.copy(
-                            isUpdatingEmail = false,
-                            emailUpdatePending = true,
-                            successMessage = getApplication<Application>().getString(
-                                com.android.example.eventpop.R.string.profile_verification_sent
-                            )
-                        )
-                    }
-                },
-                onFailure = { e ->
-                    _uiState.update {
-                        it.copy(
-                            isUpdatingEmail = false,
-                            errorMessage = e.message ?: getApplication<Application>().getString(
-                                com.android.example.eventpop.R.string.profile_email_failed
-                            ),
-                            snackbarRetryable = false
-                        )
-                    }
-                }
-            )
-        }
-    }
-
-    fun consumeEmailPendingBanner() {
-        _uiState.update { it.copy(emailUpdatePending = false) }
-    }
-
     suspend fun refreshRsvpCountInternal() {
         _rsvpCount.value = SupabaseService.countCurrentUserEventInterests()
     }
