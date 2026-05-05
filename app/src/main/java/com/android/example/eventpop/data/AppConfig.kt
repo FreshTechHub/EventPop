@@ -10,7 +10,6 @@ import com.android.example.eventpop.BuildConfig
 object AppConfig {
     val supabaseUrl: String = BuildConfig.SUPABASE_URL
     val supabaseAnonKey: String = BuildConfig.SUPABASE_ANON_KEY
-    val mapsApiKey: String = BuildConfig.MAPS_API_KEY
 
     val isSupabaseConfigured: Boolean = supabaseUrl.isNotEmpty() && supabaseAnonKey.isNotEmpty()
 }

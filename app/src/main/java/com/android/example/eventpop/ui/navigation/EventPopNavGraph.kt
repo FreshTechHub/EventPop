@@ -1,32 +1,64 @@
 package com.android.example.eventpop.ui.navigation
 
+import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.EaseOutQuart
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.navigation.NavType
+import com.android.example.eventpop.EventPopApp
+import com.android.example.eventpop.LandingPageActivity
+import com.android.example.eventpop.R
+import com.android.example.eventpop.data.AuthRepository
 import com.android.example.eventpop.data.EventFilter
-import com.android.example.eventpop.ui.viewmodel.EventDetailViewModel
+import com.android.example.eventpop.ui.controller.AppViewModelFactory
+import com.android.example.eventpop.ui.controller.CreateEventViewModelFactory
 import com.android.example.eventpop.ui.home.HomeScreen
 import com.android.example.eventpop.ui.screens.DiscoverScreen
 import com.android.example.eventpop.ui.screens.EventDetailScreen
 import com.android.example.eventpop.ui.screens.FavoritesScreen
 import com.android.example.eventpop.ui.screens.FilterEventsScreen
 import com.android.example.eventpop.ui.screens.MapScreen
+import com.android.example.eventpop.ui.screens.CreateEventScreen
 import com.android.example.eventpop.ui.screens.ProfileScreen
+import com.android.example.eventpop.ui.screens.SearchScreen
+import com.android.example.eventpop.ui.viewmodel.DiscoverViewModel
+import com.android.example.eventpop.ui.viewmodel.EventDetailViewModel
+import com.android.example.eventpop.ui.viewmodel.FavoritesViewModel
+import com.android.example.eventpop.ui.viewmodel.HomeViewModel
+import com.android.example.eventpop.ui.viewmodel.MapViewModel
+import com.android.example.eventpop.ui.viewmodel.ProfileViewModel
+import com.android.example.eventpop.ui.viewmodel.CreateEventViewModel
+import com.android.example.eventpop.ui.viewmodel.SearchViewModel
+import kotlinx.coroutines.launch
 
 object EventPopDestinations {
     const val EVENTS = "events"
@@ -36,22 +68,37 @@ object EventPopDestinations {
     const val PROFILE = "profile"
     const val FILTER_EVENTS = "filter_events"
     const val FILTER_RESULT_KEY = "event_filter"
+    const val SEARCH = "search"
+    const val CREATE_EVENT = "create_event/{editEventId}"
+
+    fun createEventRoute(editEventId: String? = null): String =
+        if (editEventId.isNullOrBlank()) "create_event/new" else "create_event/$editEventId"
     const val EVENT_DETAIL = "event_detail/{eventId}"
     const val EVENT_DETAIL_ID_ARG = "eventId"
 
     fun eventDetailRoute(eventId: String) = "event_detail/$eventId"
 }
 
+/**
+ * **Controller** wiring for the main graph: owns ViewModels, hoists [com.android.example.eventpop.ui.mvc] UI state
+ * into **View** composables and forwards user actions back to ViewModels.
+ */
 @Composable
 fun EventPopNavGraph(
+    initialEventDetailId: String? = null,
     navController: NavHostController = rememberNavController()
 ) {
     val context = LocalContext.current
+    val app = remember(context.applicationContext) {
+        context.applicationContext as EventPopApp
+    }
+    val viewModelFactory = remember(app) { AppViewModelFactory(app) }
+    val coroutineScope = rememberCoroutineScope()
+
     var backPressedOnce by remember { mutableStateOf(false) }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Double-back to exit on home screen
     if (currentRoute == EventPopDestinations.EVENTS) {
         BackHandler {
             if (backPressedOnce) {
@@ -78,103 +125,269 @@ fun EventPopNavGraph(
         }
     }
 
-    val navEvents    = { navigateToTab(EventPopDestinations.EVENTS) }
-    val navMap       = { navigateToTab(EventPopDestinations.MAP) }
-    val navDiscover  = { navigateToTab(EventPopDestinations.DISCOVER) }
+    val navEvents = { navigateToTab(EventPopDestinations.EVENTS) }
+    val navMap = { navigateToTab(EventPopDestinations.MAP) }
+    val navDiscover = { navigateToTab(EventPopDestinations.DISCOVER) }
     val navFavorites = { navigateToTab(EventPopDestinations.FAVOURITES) }
-    val navProfile   = { navigateToTab(EventPopDestinations.PROFILE) }
+    val navProfile = { navigateToTab(EventPopDestinations.PROFILE) }
+    val shouldShowBottomBar by remember(currentRoute) {
+        derivedStateOf {
+            currentRoute in setOf(
+                EventPopDestinations.EVENTS,
+                EventPopDestinations.MAP,
+                EventPopDestinations.DISCOVER,
+                EventPopDestinations.FAVOURITES,
+                EventPopDestinations.PROFILE
+            )
+        }
+    }
 
-    NavHost(
-        navController = navController,
-        startDestination = EventPopDestinations.EVENTS
-    ) {
-        // Events tab
+    var initialDetailConsumed by rememberSaveable { mutableStateOf(false) }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        bottomBar = {
+            AnimatedVisibility(
+                visible = shouldShowBottomBar,
+                enter = slideInVertically(
+                    initialOffsetY = { it },
+                    animationSpec = tween(durationMillis = 300, easing = EaseOutQuart)
+                ) + fadeIn(animationSpec = tween(300)),
+                exit = slideOutVertically(
+                    targetOffsetY = { it },
+                    animationSpec = tween(200)
+                ) + fadeOut(animationSpec = tween(200))
+            ) {
+                EventPopBottomBar(
+                    navController = navController,
+                    onNavEvents = navEvents,
+                    onNavMap = navMap,
+                    onNavDiscover = navDiscover,
+                    onNavFavorites = navFavorites,
+                    onNavProfile = navProfile
+                )
+            }
+        }
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = EventPopDestinations.EVENTS
+        ) {
         composable(EventPopDestinations.EVENTS) {
             val eventsBackStackEntry = navController.getBackStackEntry(EventPopDestinations.EVENTS)
             val filterResult by eventsBackStackEntry.savedStateHandle
                 .getStateFlow<EventFilter?>(EventPopDestinations.FILTER_RESULT_KEY, null)
                 .collectAsState(initial = null)
+            val homeViewModel: HomeViewModel = viewModel(factory = viewModelFactory)
+            val homeUiState by homeViewModel.uiState.collectAsState()
             HomeScreen(
+                uiState = homeUiState,
+                modifier = Modifier.padding(innerPadding),
                 onFilterClick = { navController.navigate(EventPopDestinations.FILTER_EVENTS) },
                 currentFilter = filterResult,
-                selectedEvents = true,
-                selectedMap = false,
-                selectedDiscover = false,
-                selectedFavorites = false,
-                selectedProfile = false,
                 onNavEvents = navEvents,
                 onNavMap = navMap,
                 onNavDiscover = navDiscover,
                 onNavFavorites = navFavorites,
                 onNavProfile = navProfile,
-                onSearchClick = { navController.navigate(EventPopDestinations.DISCOVER) },
-                onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) }
+                onSearchClick = { navController.navigate(EventPopDestinations.SEARCH) },
+                onSeeAllHotEvents = navDiscover,
+                onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) },
+                onEventRsvp = { homeViewModel.rsvpEvent(it.id) }
             )
         }
 
-        // Map tab
         composable(EventPopDestinations.MAP) {
+            val mapViewModel: MapViewModel = viewModel(factory = viewModelFactory)
+            val mapUiState by mapViewModel.uiState.collectAsState()
             MapScreen(
-                onNavEvents = navEvents,
-                onNavMap = navMap,
-                onNavDiscover = navDiscover,
-                onNavFavorites = navFavorites,
-                onNavProfile = navProfile
+                uiState = mapUiState,
+                modifier = Modifier.padding(innerPadding)
             )
         }
 
-        // Discover tab
         composable(EventPopDestinations.DISCOVER) {
+            val discoverViewModel: DiscoverViewModel = viewModel(factory = viewModelFactory)
+            val discoverUiState by discoverViewModel.uiState.collectAsState()
             DiscoverScreen(
+                modifier = Modifier.padding(innerPadding),
                 onNavEvents = navEvents,
                 onNavMap = navMap,
                 onNavDiscover = navDiscover,
                 onNavFavorites = navFavorites,
                 onNavProfile = navProfile,
-                onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) }
+                onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) },
+                uiState = discoverUiState,
+                onSearchQueryChange = discoverViewModel::setSearchQuery,
+                onSelectedCategoryChange = discoverViewModel::setSelectedCategory,
+                onSelectedDateMillisChange = discoverViewModel::setSelectedDateMillis,
+                onClearSearchAndFilters = discoverViewModel::clearSearchAndRefresh,
+                onRefresh = discoverViewModel::refresh
             )
         }
 
-        // Favorites tab
         composable(EventPopDestinations.FAVOURITES) {
+            val favoritesViewModel: FavoritesViewModel = viewModel(factory = viewModelFactory)
+            LaunchedEffect(Unit) {
+                favoritesViewModel.refresh()
+            }
+            val favoritesUiState by favoritesViewModel.uiState.collectAsState()
             FavoritesScreen(
+                uiState = favoritesUiState,
+                modifier = Modifier.padding(innerPadding),
+                onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) },
                 onNavEvents = navEvents,
                 onNavMap = navMap,
                 onNavDiscover = navDiscover,
                 onNavFavorites = navFavorites,
-                onNavProfile = navProfile
+                onNavProfile = navProfile,
+                onSignIn = {
+                    context.startActivity(
+                        Intent(context, LandingPageActivity::class.java).apply {
+                            addFlags(
+                                Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            )
+                        }
+                    )
+                },
+                onRemoveFavorite = { favoritesViewModel.removeFromFavorites(it.id) }
             )
         }
 
-        // Profile tab
+        composable(EventPopDestinations.SEARCH) {
+            val searchViewModel: SearchViewModel = viewModel(factory = viewModelFactory)
+            val searchUiState by searchViewModel.uiState.collectAsState()
+            SearchScreen(
+                navController = navController,
+                uiState = searchUiState,
+                onQueryChange = searchViewModel::setQuery
+            )
+        }
+
         composable(EventPopDestinations.PROFILE) {
+            val profileViewModel: ProfileViewModel = viewModel(factory = viewModelFactory)
+            LaunchedEffect(Unit) {
+                profileViewModel.refresh()
+            }
+            val profileUiState by profileViewModel.uiState.collectAsState()
+            val rsvpCount by profileViewModel.rsvpCount.collectAsState()
             ProfileScreen(
-                onNavEvents = navEvents,
-                onNavMap = navMap,
-                onNavDiscover = navDiscover,
-                onNavFavorites = navFavorites,
-                onNavProfile = navProfile
+                uiState = profileUiState,
+                profileViewModel = profileViewModel,
+                rsvpCount = rsvpCount,
+                modifier = Modifier.padding(innerPadding),
+                onCreateEvent = {
+                    if (AuthRepository.isLoggedIn()) {
+                        navController.navigate(EventPopDestinations.createEventRoute())
+                    } else {
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.create_event_sign_in_required),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                },
+                onLogoutConfirmed = {
+                    coroutineScope.launch {
+                        try {
+                            app.profileRepository.clearLocalCache()
+                            AuthRepository.signOut()
+                            val ctx = context
+                            ctx.startActivity(
+                                Intent(ctx, LandingPageActivity::class.java).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                }
+                            )
+                        } catch (e: Exception) {
+                            android.util.Log.e("EventPopNavGraph", "Logout failed", e)
+                        }
+                    }
+                }
             )
         }
 
-        // Full-screen event detail (off-tab)
         composable(
             route = EventPopDestinations.EVENT_DETAIL,
             arguments = listOf(navArgument(EventPopDestinations.EVENT_DETAIL_ID_ARG) {
                 type = NavType.StringType
             })
         ) { backStackEntry ->
-            val viewModel: EventDetailViewModel = viewModel(backStackEntry)
+            val detailViewModel: EventDetailViewModel = viewModel(backStackEntry, factory = viewModelFactory)
+            val detailUiState by detailViewModel.uiState.collectAsState()
+            val eventId = backStackEntry.arguments?.getString(EventPopDestinations.EVENT_DETAIL_ID_ARG).orEmpty()
+            LaunchedEffect(eventId) {
+                detailViewModel.loadEvent(eventId)
+            }
             EventDetailScreen(
                 navController = navController,
-                viewModel = viewModel,
-                navBackStackEntry = backStackEntry
+                uiState = detailUiState,
+                onToggleInterested = detailViewModel::toggleInterested,
+                onSubmitRsvp = detailViewModel::submitRsvp,
+                onConsumeRsvpSuccess = detailViewModel::consumeRsvpSuccess,
+                onRatingSelected = detailViewModel::onRatingSelected,
+                onRemoveRating = detailViewModel::onRemoveRating,
+                onRetryRatingSubmit = detailViewModel::onRetryRatingSubmit,
+                onDismissRatingError = detailViewModel::dismissRatingError,
+                onRequestSignIn = {
+                    context.startActivity(
+                        Intent(context, LandingPageActivity::class.java).apply {
+                            addFlags(
+                                Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            )
+                        }
+                    )
+                },
+                onEditEvent = {
+                    navController.navigate(EventPopDestinations.createEventRoute(eventId))
+                },
+                onDeleteEvent = {
+                    coroutineScope.launch {
+                        if (detailViewModel.deleteCurrentEvent()) {
+                            navController.popBackStack()
+                        } else {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.event_detail_delete_failed),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }
             )
         }
 
-        // Filter modal (off-tab)
         composable(EventPopDestinations.FILTER_EVENTS) {
             FilterEventsScreen(navController = navController)
         }
+
+        composable(
+            route = EventPopDestinations.CREATE_EVENT,
+            arguments = listOf(
+                navArgument("editEventId") {
+                    type = NavType.StringType
+                    defaultValue = "new"
+                }
+            )
+        ) { entry ->
+            val editArg = entry.arguments?.getString("editEventId")
+            val editId = editArg?.takeIf { it != "new" }
+            val app = LocalContext.current.applicationContext as EventPopApp
+            val createFactory = remember(editId) { CreateEventViewModelFactory(app, editId) }
+            val createViewModel: CreateEventViewModel = viewModel(factory = createFactory)
+            CreateEventScreen(
+                navController = navController,
+                viewModel = createViewModel
+            )
+        }
+    } }
+
+    LaunchedEffect(initialEventDetailId, initialDetailConsumed) {
+        if (initialDetailConsumed) return@LaunchedEffect
+        val id = initialEventDetailId ?: return@LaunchedEffect
+        navController.navigate(EventPopDestinations.eventDetailRoute(id)) {
+            launchSingleTop = true
+        }
+        initialDetailConsumed = true
     }
 }

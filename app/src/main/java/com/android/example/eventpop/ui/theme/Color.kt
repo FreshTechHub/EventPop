@@ -4,6 +4,11 @@ import androidx.compose.ui.graphics.Color
 
 // EventPop brand colors
 val AppBarNavy = Color(0xFF1B2A4A)
+/** Slightly lifted app bar tone when content scrolls beneath (Material 3 scrolled container). */
+val AppBarNavyScrolled = Color(0xFF24365A)
+/** Content on navy app bars — prefer over raw white for consistency. */
+val OnAppBar = Color(0xFFFFFFFF)
+val OnAppBarMuted = Color(0xFFB8C4DC)
 val OrangeAccent = Color(0xFFFF6B00)
 val HotSectionNavy = Color(0xFF1B2A4A)
 val CardBackground = Color(0xFFFFFFFF)

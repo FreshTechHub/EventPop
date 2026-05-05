@@ -3,38 +3,67 @@ package com.android.example.eventpop.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.example.eventpop.data.Event
-import com.android.example.eventpop.data.SupabaseService
+import com.android.example.eventpop.data.EventRepository
+import com.android.example.eventpop.ui.mvc.HomeUiState
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class HomeViewModel : ViewModel() {
+/**
+ * **Controller** for the home feed: reads/writes through [EventRepository] (Model), exposes [HomeUiState] (View).
+ */
+class HomeViewModel(
+    private val eventRepository: EventRepository
+) : ViewModel() {
 
-    private val _events = MutableStateFlow<List<Event>>(emptyList())
-    val events: StateFlow<List<Event>> = _events.asStateFlow()
+    private val isRefreshing = MutableStateFlow(false)
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    private fun computeHotEvents(events: List<Event>): List<Event> =
+        events.asSequence()
+            .sortedWith(
+                compareByDescending<Event> { it.rating ?: 0f }
+                    .thenByDescending { it.rsvpCount ?: 0 }
+            )
+            .take(6)
+            .toList()
+
+    val uiState: StateFlow<HomeUiState> = combine(
+        eventRepository.observeEvents(),
+        isRefreshing
+    ) { events, loading ->
+        HomeUiState(
+            events = events,
+            hotEvents = computeHotEvents(events),
+            isLoading = loading
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = HomeUiState()
+    )
 
     init {
-        loadEvents()
+        refresh()
     }
 
-    fun loadEvents() {
+    fun refresh() {
         viewModelScope.launch {
-            _isLoading.value = true
-            _events.value = SupabaseService.fetchEvents()
-            _isLoading.value = false
+            isRefreshing.value = true
+            try {
+                eventRepository.refreshEvents()
+            } finally {
+                isRefreshing.value = false
+            }
         }
     }
 
     fun rsvpEvent(eventId: String) {
         viewModelScope.launch {
-            val success = SupabaseService.rsvpToEvent(eventId)
-            if (success) {
-                // Refresh events to show updated RSVP count
-                loadEvents()
+            if (eventRepository.rsvpToEvent(eventId)) {
+                refresh()
             }
         }
     }

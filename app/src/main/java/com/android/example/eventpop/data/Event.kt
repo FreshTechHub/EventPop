@@ -29,20 +29,21 @@ data class Event(
     val startTime: String? = null,
     val endTime: String? = null,
     val priceInfo: String,
+    /** Raw price from backend when present (for edit form). */
+    val price: Double? = null,
     val isFree: Boolean = false,
     val imageUrl: String? = null,
     val category: EventCategory,
     val rating: Float? = null,
+    val ratingCount: Int = 0,
     val rsvpCount: Int? = null,
     val description: String? = null,
     val organizerName: String? = null,
     val isInterested: Boolean = false,
     val latitude: Double? = null,
-    val longitude: Double? = null
+    val longitude: Double? = null,
+    /** Host user id from Supabase when present; used for edit/delete affordances. */
+    val createdBy: String? = null
 ) {
     val subtitle: String get() = "$location · $timeInfo · $priceInfo"
-}
-
-object SampleEvents {
-    val list: List<Event> = emptyList()
 }

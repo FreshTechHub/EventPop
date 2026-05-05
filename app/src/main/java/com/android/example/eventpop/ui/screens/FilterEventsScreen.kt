@@ -7,7 +7,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,7 +21,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -31,12 +29,11 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.SelectableChipColors
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -44,7 +41,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
@@ -58,8 +57,9 @@ import com.android.example.eventpop.data.EventLocation
 import com.android.example.eventpop.data.EventType
 import com.android.example.eventpop.data.TimeRange
 import com.android.example.eventpop.ui.navigation.EventPopDestinations
-import com.android.example.eventpop.ui.theme.AppBarNavy
+import com.android.example.eventpop.ui.components.EventPopCenteredTopBar
 import com.android.example.eventpop.ui.viewmodel.FilterEventsViewModel
+import com.android.example.eventpop.ui.mappers.icon
 
 private val FilterScreenBackground = Color(0xFF0D1117)
 private val FilterChipSelected = Color(0xFF2196F3)
@@ -76,31 +76,16 @@ fun FilterEventsScreen(
 ) {
     val filter by viewModel.filter.collectAsState()
 
+    val filterTopBarState = rememberTopAppBarState()
+    val filterScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(filterTopBarState)
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.filter_events_title),
-                        color = SectionHeaderColor,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = SectionHeaderColor
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = AppBarNavy,
-                    titleContentColor = SectionHeaderColor,
-                    navigationIconContentColor = SectionHeaderColor
-                )
+            EventPopCenteredTopBar(
+                title = stringResource(R.string.filter_events_title),
+                onBackClick = { navController.popBackStack() },
+                backContentDescription = stringResource(R.string.back),
+                scrollBehavior = filterScrollBehavior
             )
         },
         containerColor = FilterScreenBackground,
@@ -147,6 +132,7 @@ fun FilterEventsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .nestedScroll(filterScrollBehavior.nestedScrollConnection)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
@@ -267,17 +253,18 @@ private fun FilterSectionLabel(text: String) {
     )
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FlowRowChips(
     eventTypes: List<EventType>,
     selectedTypes: Set<EventType>,
     onToggleType: (EventType) -> Unit
 ) {
-    androidx.compose.foundation.layout.FlowRow(
-        modifier = Modifier.fillMaxWidth(),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalAlignment = Alignment.CenterVertically
     ) {
         eventTypes.forEach { type ->
             val selected = type in selectedTypes
@@ -287,7 +274,7 @@ private fun FlowRowChips(
                 label = { Text(type.label) },
                 leadingIcon = {
                     Icon(
-                        imageVector = if (selected) Icons.Filled.Check else type.icon,
+                        imageVector = if (selected) Icons.Filled.Check else type.icon(),
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
                         tint = SectionHeaderColor

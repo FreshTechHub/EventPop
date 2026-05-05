@@ -9,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -100,8 +101,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.jan.supabase.auth.handleDeeplinks
+import com.android.example.eventpop.data.AuthRepository
 import com.android.example.eventpop.data.SupabaseService
+import com.android.example.eventpop.ui.navigation.AuthNavGraph
 import androidx.compose.ui.window.Dialog
 import com.android.example.eventpop.ui.theme.EventPopTheme
 import androidx.compose.material3.CircularProgressIndicator
@@ -141,6 +143,7 @@ private val ugandaCities = listOf(
 class LandingPageActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         enableEdgeToEdge()
 
         // Check if this is the first launch
@@ -161,21 +164,51 @@ class LandingPageActivity : ComponentActivity() {
                     }
 
                     // Check session
-                    if (SupabaseService.isUserLoggedIn()) {
-                        startActivity(Intent(this@LandingPageActivity, MainActivity::class.java))
+                    if (AuthRepository.isLoggedIn()) {
+                        startActivity(
+                            Intent(this@LandingPageActivity, MainActivity::class.java).apply {
+                                addFlags(
+                                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                )
+                            }
+                        )
                         finish()
                     }
                     isCheckingAuth = false
                 }
 
                 if (!isCheckingAuth) {
-                    LandingPage()
+                    AuthNavGraph(
+                        onAuthenticated = { pendingEventDetailId ->
+                            startActivity(
+                                Intent(this@LandingPageActivity, MainActivity::class.java).apply {
+                                    addFlags(
+                                        Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                    )
+                                    if (pendingEventDetailId != null) {
+                                        putExtra(MainActivity.EXTRA_EVENT_DETAIL_ID, pendingEventDetailId)
+                                    }
+                                }
+                            )
+                            finish()
+                        }
+                    )
                 } else {
                     Box(modifier = Modifier.fillMaxSize().background(LandingBackground), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = GradientOrange)
                     }
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        try {
+            SupabaseService.handleDeeplinks(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("LandingPage", "Deep link error", e)
         }
     }
 }

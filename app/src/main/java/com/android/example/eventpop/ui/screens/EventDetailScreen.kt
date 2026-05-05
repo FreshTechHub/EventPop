@@ -1,15 +1,26 @@
 package com.android.example.eventpop.ui.screens
 
+import android.app.Activity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,26 +28,32 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarRate
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,16 +61,18 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -62,56 +81,91 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import androidx.navigation.NavController
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.android.example.eventpop.R
 import com.android.example.eventpop.data.Event
-import com.android.example.eventpop.ui.theme.OrangeAccent
+import com.android.example.eventpop.ui.components.AvatarComposable
+import com.android.example.eventpop.ui.mvc.EventDetailUiState
 import com.android.example.eventpop.ui.theme.AppBarNavy
-import com.android.example.eventpop.ui.theme.SubtitleGray
 import com.android.example.eventpop.ui.theme.ContentGray
 import com.android.example.eventpop.ui.theme.DetailBackground
 import com.android.example.eventpop.ui.theme.FreeGreen
 import com.android.example.eventpop.ui.theme.HeartRed
-import com.android.example.eventpop.ui.theme.RsvpBarNavy
-import com.android.example.eventpop.ui.theme.RsvpSuccessGreen
-import com.android.example.eventpop.ui.theme.GradientPurple
-import com.android.example.eventpop.ui.viewmodel.EventDetailViewModel
-import androidx.navigation.NavController
-import androidx.navigation.NavBackStackEntry
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import com.android.example.eventpop.ui.theme.OrangeAccent
+import com.android.example.eventpop.ui.theme.SubtitleGray
 import kotlinx.coroutines.delay
 
-private val HeroHeight = 280.dp
-private val HeroGradient = Brush.verticalGradient(
-    colors = listOf(OrangeAccent, GradientPurple)
+private val HeroHeight = 300.dp
+private val ToolbarScrollThreshold = 240.dp
+
+private fun lightenColor(base: Color, amount: Float): Color = Color(
+    red = base.red + (1f - base.red) * amount,
+    green = base.green + (1f - base.green) * amount,
+    blue = base.blue + (1f - base.blue) * amount,
+    alpha = base.alpha
 )
-private val HeroScrim = Brush.verticalGradient(
-    colors = listOf(Color.Transparent, DetailBackground)
+
+private val MetaPillBackground = lightenColor(DetailBackground, 0.08f)
+
+private fun heroScrimBrush(): Brush = Brush.verticalGradient(
+    colorStops = arrayOf(
+        0f to Color.Transparent,
+        0.5f to Color.Transparent,
+        1f to DetailBackground
+    )
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EventDetailScreen(
     navController: NavController,
-    viewModel: EventDetailViewModel,
-    navBackStackEntry: NavBackStackEntry
+    uiState: EventDetailUiState,
+    onToggleInterested: () -> Unit,
+    onSubmitRsvp: () -> Unit,
+    onConsumeRsvpSuccess: () -> Unit,
+    onRatingSelected: (Int) -> Unit = {},
+    onRemoveRating: () -> Unit = {},
+    onRetryRatingSubmit: () -> Unit = {},
+    onDismissRatingError: () -> Unit = {},
+    onRequestSignIn: () -> Unit = {},
+    onEditEvent: () -> Unit = {},
+    onDeleteEvent: () -> Unit = {}
 ) {
-    val eventId = navBackStackEntry.arguments?.getString("eventId")
-    val event by viewModel.event.collectAsState()
-    val isInterested by viewModel.isInterested.collectAsState()
-    val rsvpSuccess by viewModel.rsvpSuccess.collectAsState()
-    val rsvpLoading by viewModel.rsvpLoading.collectAsState()
+    val event = uiState.event
+    val isOwner = uiState.isOwner
+    val isInterested = uiState.isInterested
+    val rsvpSuccess = uiState.rsvpSuccess
+    val rsvpLoading = uiState.rsvpLoading
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val view = LocalView.current
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    val ratingRetryLabel = stringResource(R.string.rating_error_retry)
 
     val heartColor by animateColorAsState(
         targetValue = if (isInterested) HeartRed else Color.White,
@@ -119,105 +173,327 @@ fun EventDetailScreen(
         label = "heart"
     )
 
-    LaunchedEffect(eventId) {
-        viewModel.loadEvent(eventId ?: "")
-    }
-
     LaunchedEffect(rsvpSuccess) {
         if (rsvpSuccess) {
             snackbarHostState.showSnackbar(
                 message = context.getString(R.string.rsvp_success_message),
                 withDismissAction = true
             )
+            onConsumeRsvpSuccess()
         }
+    }
+
+    LaunchedEffect(uiState.ratingSubmitError) {
+        val err = uiState.ratingSubmitError ?: return@LaunchedEffect
+        when (
+            snackbarHostState.showSnackbar(
+                message = err,
+                actionLabel = ratingRetryLabel
+            )
+        ) {
+            SnackbarResult.ActionPerformed -> onRetryRatingSubmit()
+            SnackbarResult.Dismissed -> onDismissRatingError()
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val window = (context as? Activity)?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        val oldLight = controller?.isAppearanceLightStatusBars
+        controller?.isAppearanceLightStatusBars = false
+        onDispose {
+            controller?.isAppearanceLightStatusBars = oldLight ?: true
+        }
+    }
+
+    if (showDeleteConfirm && event != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text(stringResource(R.string.event_detail_delete_title)) },
+            text = { Text(stringResource(R.string.event_detail_delete_message, event.title)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirm = false
+                        onDeleteEvent()
+                    }
+                ) {
+                    Text(stringResource(R.string.event_detail_delete_confirm), color = HeartRed)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text(stringResource(R.string.create_event_dialog_cancel))
+                }
+            }
+        )
     }
 
     Scaffold(
         modifier = Modifier.background(DetailBackground),
         containerColor = DetailBackground,
-        topBar = {
-            TopAppBar(
-                title = { },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                            tint = Color.White
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.toggleInterested() }) {
-                        Icon(
-                            imageVector = if (isInterested) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                            contentDescription = stringResource(R.string.content_desc_favorite),
-                            tint = heartColor
-                        )
-                    }
-                    IconButton(onClick = { /* share */ }) {
-                        Icon(
-                            imageVector = Icons.Filled.Share,
-                            contentDescription = stringResource(R.string.share),
-                            tint = Color.White
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White,
-                    actionIconContentColor = Color.White
-                )
-            )
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                val isRatingErr = data.visuals.actionLabel == ratingRetryLabel
+                if (isRatingErr) {
+                    Snackbar(
+                        snackbarData = data,
+                        containerColor = Color(0xFFE53935),
+                        contentColor = Color.White,
+                        actionContentColor = Color.White
+                    )
+                } else {
+                    Snackbar(snackbarData = data)
+                }
+            }
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             event?.let { ev ->
                 EventDetailBottomBar(
                     event = ev,
                     rsvpSuccess = rsvpSuccess,
                     rsvpLoading = rsvpLoading,
-                    onRsvpClick = { viewModel.submitRsvp() }
+                    onRsvpClick = onSubmitRsvp
                 )
             }
         }
     ) { innerPadding ->
-        event?.let { ev ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            ) {
-                HeroSection(event = ev)
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp)
-                        .padding(bottom = 16.dp)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(DetailBackground)
+                .padding(innerPadding)
+        ) {
+            if (event != null) {
+                val listState = rememberLazyListState()
+                val density = LocalDensity.current
+                val thresholdPx = remember(density) {
+                    with(density) { ToolbarScrollThreshold.toPx() }
+                }
+                val rawBarAlpha by remember(listState, thresholdPx) {
+                    derivedStateOf {
+                        if (listState.firstVisibleItemIndex > 0) {
+                            1f
+                        } else {
+                            (listState.firstVisibleItemScrollOffset / thresholdPx).coerceIn(0f, 1f)
+                        }
+                    }
+                }
+                val barBgAlpha by animateFloatAsState(
+                    targetValue = rawBarAlpha,
+                    animationSpec = tween(200),
+                    label = "toolbarBg"
+                )
+
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 8.dp)
                 ) {
-                    TitleAndMetaBlock(ev)
-                    HorizontalDivider(color = Color(0xFF1B2A4A), modifier = Modifier.padding(vertical = 12.dp))
-                    VibeCheckBlock(ev)
-                    HorizontalDivider(color = Color(0xFF1B2A4A), modifier = Modifier.padding(vertical = 12.dp))
-                    AboutBlock(ev)
-                    HorizontalDivider(color = Color(0xFF1B2A4A), modifier = Modifier.padding(vertical = 12.dp))
-                    OrganizerBlock(ev)
-                    HorizontalDivider(color = Color(0xFF1B2A4A), modifier = Modifier.padding(vertical = 12.dp))
-                    MapBlock()
+                    item(key = "hero") {
+                        HeroSection(event = event)
+                    }
+                    item(key = "title") {
+                        TitleAndMetaBlock(
+                            event = event,
+                            modifier = Modifier.padding(horizontal = 20.dp)
+                        )
+                    }
+                    item(key = "vibe") {
+                        VibeCheckBlock(
+                            event = event,
+                            myRating = uiState.myRating,
+                            hasRated = uiState.hasRated,
+                            isSubmitting = uiState.isSubmittingRating,
+                            isUserSignedIn = uiState.isUserSignedIn,
+                            isOwner = uiState.isOwner,
+                            onRatingSelected = onRatingSelected,
+                            onRemoveRating = onRemoveRating,
+                            onRequestSignIn = onRequestSignIn,
+                            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp)
+                        )
+                    }
+                    item(key = "about") {
+                        AboutBlock(
+                            event = event,
+                            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp)
+                        )
+                    }
+                    item(key = "organizer") {
+                        OrganizerBlock(
+                            event = event,
+                            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp)
+                        )
+                    }
+                    item(key = "map") {
+                        MapBlock(
+                            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 32.dp)
+                        )
+                    }
+                }
+
+                EventDetailFloatingToolbar(
+                    barBgAlpha = barBgAlpha,
+                    heartColor = heartColor,
+                    isInterested = isInterested,
+                    isOwner = isOwner,
+                    onBack = { navController.popBackStack() },
+                    onToggleInterested = onToggleInterested,
+                    onShare = { /* share */ },
+                    onEditEvent = onEditEvent,
+                    onDeleteRequest = { showDeleteConfirm = true }
+                )
+            } else {
+                EventDetailLoadingShimmer()
+            }
+        }
+    }
+}
+
+@Composable
+private fun EventDetailFloatingToolbar(
+    barBgAlpha: Float,
+    heartColor: Color,
+    isInterested: Boolean,
+    isOwner: Boolean,
+    onBack: () -> Unit,
+    onToggleInterested: () -> Unit,
+    onShare: () -> Unit,
+    onEditEvent: () -> Unit,
+    onDeleteRequest: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .height(56.dp)
+            .background(AppBarNavy.copy(alpha = barBgAlpha))
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CircularToolbarIcon(onClick = onBack) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = stringResource(R.string.back),
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isOwner) {
+                CircularToolbarIcon(onClick = onEditEvent) {
+                    Icon(
+                        imageVector = Icons.Filled.Edit,
+                        contentDescription = stringResource(R.string.event_detail_edit),
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                CircularToolbarIcon(onClick = onDeleteRequest) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = stringResource(R.string.event_detail_delete),
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
-        } ?: run {
+            CircularToolbarIcon(onClick = onShare) {
+                Icon(
+                    imageVector = Icons.Filled.Share,
+                    contentDescription = stringResource(R.string.share),
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            CircularToolbarIcon(onClick = onToggleInterested) {
+                Icon(
+                    imageVector = if (isInterested) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    contentDescription = stringResource(R.string.content_desc_favorite),
+                    tint = heartColor,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CircularToolbarIcon(
+    onClick: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color.White.copy(alpha = 0.4f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun EventDetailLoadingShimmer() {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val shift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerShift"
+    )
+    val shimmerLow = lightenColor(AppBarNavy, 0.12f)
+    val shimmerHigh = ContentGray.copy(alpha = 0.2f)
+    val brush = Brush.linearGradient(
+        colors = listOf(shimmerLow, shimmerHigh, shimmerLow),
+        start = Offset(shift * 400f, 0f),
+        end = Offset(shift * 400f + 200f, 200f)
+    )
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(HeroHeight)
+                .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+                .background(brush)
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        repeat(3) { i ->
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Loading…",
-                    color = ContentGray
+                    .fillMaxWidth(fraction = when (i) {
+                        0 -> 0.92f
+                        1 -> 0.72f
+                        else -> 0.55f
+                    })
+                    .height(14.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(brush)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(2) {
+                Box(
+                    modifier = Modifier
+                        .width(88.dp)
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(brush)
                 )
             }
         }
@@ -239,7 +515,7 @@ private fun HeroSection(event: Event) {
         modifier = Modifier
             .fillMaxWidth()
             .height(HeroHeight)
-            .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+            .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
     ) {
         Box(
             modifier = Modifier
@@ -260,43 +536,58 @@ private fun HeroSection(event: Event) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(HeroGradient)
-                )
+                        .background(AppBarNavy),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.icon),
+                        contentDescription = null,
+                        modifier = Modifier.size(80.dp),
+                        colorFilter = ColorFilter.tint(Color.White)
+                    )
+                }
             }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(HeroScrim),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Event,
-                    contentDescription = null,
-                    modifier = Modifier.size(80.dp),
-                    tint = Color.White.copy(alpha = 0.2f)
-                )
-            }
+                    .background(heroScrimBrush())
+            )
         }
         Box(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
+                .align(Alignment.BottomStart)
                 .padding(16.dp)
-                .clip(RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(20.dp))
                 .background(OrangeAccent)
-                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp)
         ) {
             Text(
-                text = event.category.displayName,
+                text = event.category.displayName.uppercase(),
                 color = Color.White,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.6.sp
             )
         }
     }
 }
 
 @Composable
-private fun TitleAndMetaBlock(event: Event) {
+private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp),
+        fontSize = 11.sp,
+        color = SubtitleGray,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 0.8.sp
+    )
+}
+
+@Composable
+private fun TitleAndMetaBlock(event: Event, modifier: Modifier = Modifier) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(event) {
         delay(0L)
@@ -304,222 +595,625 @@ private fun TitleAndMetaBlock(event: Event) {
     }
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 4 }
+        enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 12 },
+        modifier = modifier
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = event.title,
+                modifier = Modifier.fillMaxWidth(),
                 color = Color.White,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.ExtraBold
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Black,
+                lineHeight = 34.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.LocationOn, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    text = event.area ?: event.location,
-                    color = ContentGray,
-                    fontSize = 14.sp
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.CalendarToday, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.size(8.dp))
-                Text(text = event.date ?: event.timeInfo, color = ContentGray, fontSize = 14.sp)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.AccessTime, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    text = if (event.startTime != null && event.endTime != null) "${event.startTime} - ${event.endTime}" else event.timeInfo,
-                    color = ContentGray,
-                    fontSize = 14.sp
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Group, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    text = "${event.rsvpCount ?: 0} people going",
-                    color = ContentGray,
-                    fontSize = 14.sp
-                )
-            }
-            if (event.isFree) {
-                Text(
-                    text = stringResource(R.string.free_entry),
-                    color = FreeGreen,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            } else {
-                Text(
-                    text = event.priceInfo,
-                    color = OrangeAccent,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun VibeCheckBlock(event: Event) {
-    var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(event) {
-        delay(80L)
-        visible = true
-    }
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 4 }
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.StarRate, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    text = stringResource(R.string.vibe_check),
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                val rating = event.rating ?: 0f
-                repeat(5) { index ->
-                    Icon(
-                        imageVector = if (index < rating.toInt().coerceIn(0, 5)) Icons.Filled.Star else Icons.Outlined.Star,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = if (index < rating.toInt().coerceIn(0, 5)) OrangeAccent else ContentGray
+            Spacer(modifier = Modifier.height(12.dp))
+            val locationText = event.area ?: event.location
+            val dateText = event.date ?: event.timeInfo
+            val timeText =
+                if (event.startTime != null && event.endTime != null) {
+                    "${event.startTime} - ${event.endTime}"
+                } else {
+                    event.timeInfo
+                }
+            val headcount = stringResource(R.string.people_going, event.rsvpCount ?: 0)
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                item {
+                    MetaPill(
+                        icon = Icons.Filled.LocationOn,
+                        label = locationText
                     )
                 }
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    text = stringResource(R.string.rating_out_of_five, rating),
-                    color = ContentGray,
-                    fontSize = 14.sp
-                )
+                item {
+                    MetaPill(
+                        icon = Icons.Filled.CalendarToday,
+                        label = dateText
+                    )
+                }
+                item {
+                    MetaPill(
+                        icon = Icons.Filled.AccessTime,
+                        label = timeText
+                    )
+                }
+                item {
+                    MetaPill(
+                        icon = Icons.Filled.Group,
+                        label = headcount
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            if (event.isFree) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(FreeGreen)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "FREE",
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(OrangeAccent)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = event.priceInfo,
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun AboutBlock(event: Event) {
-    var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(event) {
-        delay(160L)
-        visible = true
-    }
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 4 }
+private fun MetaPill(
+    icon: ImageVector,
+    label: String
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(MetaPillBackground)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = stringResource(R.string.about_this_event),
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = event.description ?: "No description provided.",
-                color = ContentGray,
-                fontSize = 14.sp,
-                lineHeight = 22.sp
-            )
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(14.dp),
+            tint = OrangeAccent
+        )
+        Text(
+            text = label,
+            modifier = Modifier.widthIn(max = 220.dp),
+            color = ContentGray,
+            fontSize = 12.sp,
+            softWrap = true,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
 @Composable
-private fun OrganizerBlock(event: Event) {
+private fun VibeCheckBlock(
+    event: Event,
+    myRating: Int?,
+    hasRated: Boolean,
+    isSubmitting: Boolean,
+    isUserSignedIn: Boolean,
+    isOwner: Boolean,
+    onRatingSelected: (Int) -> Unit,
+    onRemoveRating: () -> Unit,
+    onRequestSignIn: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(event) {
-        delay(240L)
+    LaunchedEffect(event.id) {
+        delay(100L)
         visible = true
     }
+    val rating = event.rating ?: 0f
+    val count = event.ratingCount
+
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 4 }
+        enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 12 },
+        modifier = modifier
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Person, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    text = stringResource(R.string.organized_by),
-                    color = ContentGray,
-                    fontSize = 14.sp
-                )
-                Spacer(Modifier.size(4.dp))
-                Text(
-                    text = event.organizerName ?: "Unknown Organizer",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            OutlinedButton(
-                onClick = { },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.vibe_check).uppercase(),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = SubtitleGray,
+                letterSpacing = 0.8.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(stringResource(R.string.contact_organizer))
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        text = if (count > 0) "%.1f".format(rating) else "--",
+                        fontSize = 44.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        val filled = rating.toInt().coerceIn(0, 5)
+                        repeat(5) { index ->
+                            Icon(
+                                imageVector = if (index < filled) {
+                                    Icons.Filled.Star
+                                } else {
+                                    Icons.Outlined.Star
+                                },
+                                contentDescription = null,
+                                tint = if (index < filled) {
+                                    OrangeAccent
+                                } else {
+                                    SubtitleGray.copy(alpha = 0.4f)
+                                },
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        text = if (count > 0) {
+                            stringResource(R.string.rating_count_line, count)
+                        } else {
+                            "No ratings yet"
+                        },
+                        fontSize = 12.sp,
+                        color = SubtitleGray,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp)
+                    )
+                }
+
+                if (count > 0) {
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        listOf(5, 4, 3, 2, 1).forEach { starLevel ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "$starLevel",
+                                    fontSize = 10.sp,
+                                    color = SubtitleGray,
+                                    modifier = Modifier.width(12.dp)
+                                )
+                                Icon(
+                                    imageVector = Icons.Filled.Star,
+                                    contentDescription = null,
+                                    tint = OrangeAccent,
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .padding(start = 2.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                LinearProgressIndicator(
+                                    progress = { 0f },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp)),
+                                    color = OrangeAccent,
+                                    trackColor = Color(0xFF2C3E6B),
+                                    strokeCap = StrokeCap.Round
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                thickness = 1.dp,
+                color = Color.White.copy(alpha = 0.08f)
+            )
+
+            when {
+                isOwner -> {
+                    Text(
+                        text = stringResource(R.string.rating_cannot_rate_own),
+                        color = SubtitleGray,
+                        fontSize = 12.sp,
+                        fontStyle = FontStyle.Italic,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                !isUserSignedIn -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Lock,
+                            contentDescription = null,
+                            tint = SubtitleGray,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.rating_sign_in_to_rate),
+                            color = SubtitleGray,
+                            fontSize = 13.sp,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 8.dp)
+                        )
+                        TextButton(onClick = onRequestSignIn) {
+                            Text(
+                                text = stringResource(R.string.rating_sign_in_cta),
+                                color = OrangeAccent,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                }
+                else -> {
+                    Text(
+                        text = if (hasRated) {
+                            stringResource(R.string.rating_your_rating_header)
+                        } else {
+                            stringResource(R.string.rating_rate_experience)
+                        },
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        repeat(5) { index ->
+                            val isFilled = index < (myRating ?: 0)
+                            val scale by animateFloatAsState(
+                                targetValue = if (isFilled) 1.15f else 1f,
+                                animationSpec = androidx.compose.animation.core.spring(
+                                    stiffness = 600f,
+                                    dampingRatio = 0.4f
+                                ),
+                                label = "ratingStarScale$index"
+                            )
+                            IconButton(
+                                onClick = {
+                                    if (!isSubmitting) onRatingSelected(index + 1)
+                                },
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
+                            ) {
+                                if (isSubmitting && index < (myRating ?: 0)) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        color = OrangeAccent,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = if (isFilled) {
+                                            Icons.Filled.Star
+                                        } else {
+                                            Icons.Outlined.Star
+                                        },
+                                        contentDescription = "${index + 1} stars",
+                                        tint = if (isFilled) {
+                                            OrangeAccent
+                                        } else {
+                                            SubtitleGray.copy(alpha = 0.4f)
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (myRating != null) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                tint = OrangeAccent,
+                                modifier = Modifier.size(14.dp),
+                                contentDescription = null
+                            )
+                            Text(
+                                text = stringResource(R.string.rating_you_rated_fmt, myRating),
+                                fontSize = 12.sp,
+                                color = SubtitleGray,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 6.dp)
+                            )
+                            TextButton(
+                                onClick = onRemoveRating,
+                                contentPadding = PaddingValues(horizontal = 8.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.rating_remove),
+                                    color = OrangeAccent,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = stringResource(R.string.rating_tap_to_rate),
+                                fontSize = 12.sp,
+                                color = SubtitleGray,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+
+                    AnimatedVisibility(
+                        visible = hasRated,
+                        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 })
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(FreeGreen.copy(alpha = 0.12f))
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = FreeGreen,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = stringResource(R.string.rating_submitted),
+                                color = FreeGreen,
+                                fontSize = 12.sp,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun MapBlock() {
+private fun AboutBlock(event: Event, modifier: Modifier = Modifier) {
+    var visible by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
+    LaunchedEffect(event.id) {
+        expanded = false
+    }
+    LaunchedEffect(event) {
+        delay(200L)
+        visible = true
+    }
+    val description = event.description ?: "No description provided."
+    val interactionSource = remember { MutableInteractionSource() }
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 12 },
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize()
+        ) {
+            SectionHeader(stringResource(R.string.detail_section_about).uppercase())
+            Text(
+                text = description,
+                color = ContentGray,
+                fontSize = 15.sp,
+                lineHeight = 24.sp,
+                maxLines = if (expanded) Int.MAX_VALUE else 4,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                text = if (expanded) {
+                    stringResource(R.string.detail_show_less)
+                } else {
+                    stringResource(R.string.detail_read_more)
+                },
+                color = OrangeAccent,
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp)
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = { expanded = !expanded }
+                    )
+            )
+        }
+    }
+}
+
+@Composable
+private fun OrganizerBlock(event: Event, modifier: Modifier = Modifier) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(event) {
+        delay(300L)
+        visible = true
+    }
+    val name = event.organizerName ?: "Unknown Organizer"
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 12 },
+        modifier = modifier
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            SectionHeader(stringResource(R.string.detail_section_organizer).uppercase())
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AvatarComposable(
+                    avatarUrl = "",
+                    avatarLocalPath = "",
+                    displayName = name,
+                    size = 44.dp,
+                    initialsFontSize = 14.sp,
+                    modifier = Modifier.clip(CircleShape)
+                )
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 12.dp)
+                ) {
+                    Text(
+                        text = name,
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = stringResource(R.string.detail_organizer_role),
+                        modifier = Modifier.fillMaxWidth(),
+                        color = ContentGray,
+                        fontSize = 12.sp
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(OrangeAccent.copy(alpha = 0.1f))
+                        .clickable { },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.ChatBubbleOutline,
+                        contentDescription = stringResource(R.string.contact_organizer),
+                        tint = OrangeAccent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MapBlock(modifier: Modifier = Modifier) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        delay(320L)
+        delay(400L)
         visible = true
     }
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 4 }
+        enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 12 },
+        modifier = modifier
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Map, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    text = stringResource(R.string.location_title),
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+        Column(modifier = Modifier.fillMaxWidth()) {
+            SectionHeader(stringResource(R.string.location_title).uppercase())
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(140.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(AppBarNavy, AppBarNavy.copy(alpha = 0.8f))
+                    .height(160.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(AppBarNavy)
+                    .drawBehind {
+                        val stroke = Stroke(
+                            width = 1.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f), 0f),
+                            cap = StrokeCap.Round
                         )
-                    ),
+                        drawRoundRect(
+                            color = ContentGray.copy(alpha = 0.2f),
+                            style = stroke,
+                            cornerRadius = CornerRadius(20.dp.toPx(), 20.dp.toPx())
+                        )
+                    },
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Icon(
                         imageVector = Icons.Filled.Map,
                         contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = Color.White.copy(alpha = 0.3f)
+                        modifier = Modifier.size(32.dp),
+                        tint = ContentGray.copy(alpha = 0.4f)
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = stringResource(R.string.map_coming_soon),
-                        color = ContentGray,
-                        fontSize = 14.sp
+                        color = ContentGray.copy(alpha = 0.6f),
+                        fontSize = 13.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -534,71 +1228,102 @@ private fun EventDetailBottomBar(
     rsvpLoading: Boolean,
     onRsvpClick: () -> Unit
 ) {
-    val rsvpButtonColor by animateColorAsState(
-        targetValue = if (rsvpSuccess) Color(0xFF059669) else Color.Transparent,
+    val buttonBg by animateColorAsState(
+        targetValue = if (rsvpSuccess) FreeGreen else OrangeAccent,
         animationSpec = tween(300),
-        label = "rsvpButton"
+        label = "rsvpButtonBg"
     )
-    BottomAppBar(
-        containerColor = AppBarNavy,
-        contentColor = Color.White
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AppBarNavy)
     ) {
+        HorizontalDivider(
+            thickness = 1.dp,
+            color = Color.White.copy(alpha = 0.08f)
+        )
         Row(
             modifier = Modifier
-                .weight(1f)
+                .fillMaxWidth()
+                .height(72.dp)
                 .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            if (event.isFree) {
+            Column(modifier = Modifier.weight(1f)) {
+                if (event.isFree) {
+                    Text(
+                        text = "FREE",
+                        color = FreeGreen,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                } else {
+                    Text(
+                        text = event.priceInfo,
+                        color = OrangeAccent,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
                 Text(
-                    text = stringResource(R.string.free),
-                    color = Color(0xFF059669),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            } else {
-                Text(
-                    text = event.priceInfo,
-                    color = OrangeAccent,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
+                    text = stringResource(R.string.detail_per_person),
+                    color = ContentGray,
+                    fontSize = 11.sp
                 )
             }
-        }
-        Button(
-            onClick = onRsvpClick,
-            enabled = !rsvpSuccess,
-            modifier = Modifier
-                .height(48.dp)
-                .padding(end = 16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = OrangeAccent,
-                disabledContainerColor = rsvpButtonColor,
-                contentColor = Color.White,
-                disabledContentColor = Color.White
-            ),
-            shape = RoundedCornerShape(24.dp),
-            contentPadding = ButtonDefaults.ContentPadding,
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
-        ) {
-            if (rsvpLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = Color.White,
-                    strokeWidth = 2.dp
-                )
-            } else if (rsvpSuccess) {
-                Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color.White)
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    text = "RSVP'd",
-                    fontWeight = FontWeight.Bold
-                )
-            } else {
-                Text(
-                    text = "RSVP Now",
-                    fontWeight = FontWeight.Bold
-                )
+            Button(
+                onClick = onRsvpClick,
+                enabled = !rsvpSuccess,
+                modifier = Modifier
+                    .width(140.dp)
+                    .height(48.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = OrangeAccent,
+                    disabledContainerColor = buttonBg,
+                    contentColor = Color.White,
+                    disabledContentColor = Color.White
+                ),
+                shape = RoundedCornerShape(24.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+            ) {
+                when {
+                    rsvpLoading -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    }
+                    rsvpSuccess -> {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = Color.White
+                            )
+                            Text(
+                                text = "RSVP'd",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+                    else -> {
+                        Text(
+                            text = stringResource(R.string.rsvp_now),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
             }
         }
     }
