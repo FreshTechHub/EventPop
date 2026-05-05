@@ -1,7 +1,6 @@
 package com.android.example.eventpop.ui.screens
 
 import android.app.Activity
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
@@ -13,10 +12,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -64,6 +60,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
@@ -113,8 +110,6 @@ import coil.request.ImageRequest
 import com.android.example.eventpop.R
 import com.android.example.eventpop.data.Event
 import com.android.example.eventpop.ui.components.AvatarComposable
-import com.android.example.eventpop.ui.components.InteractiveStarRating
-import com.android.example.eventpop.ui.components.ReadOnlyStarRating
 import com.android.example.eventpop.ui.mvc.EventDetailUiState
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.ContentGray
@@ -305,9 +300,13 @@ fun EventDetailScreen(
                         )
                     }
                     item(key = "vibe") {
-                        VibeCheckSection(
+                        VibeCheckBlock(
                             event = event,
-                            uiState = uiState,
+                            myRating = uiState.myRating,
+                            hasRated = uiState.hasRated,
+                            isSubmitting = uiState.isSubmittingRating,
+                            isUserSignedIn = uiState.isUserSignedIn,
+                            isOwner = uiState.isOwner,
                             onRatingSelected = onRatingSelected,
                             onRemoveRating = onRemoveRating,
                             onRequestSignIn = onRequestSignIn,
@@ -577,7 +576,9 @@ private fun HeroSection(event: Event) {
 private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
-        modifier = modifier.padding(bottom = 4.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp),
         fontSize = 11.sp,
         color = SubtitleGray,
         fontWeight = FontWeight.Bold,
@@ -597,9 +598,10 @@ private fun TitleAndMetaBlock(event: Event, modifier: Modifier = Modifier) {
         enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 12 },
         modifier = modifier
     ) {
-        Column {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = event.title,
+                modifier = Modifier.fillMaxWidth(),
                 color = Color.White,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Black,
@@ -656,6 +658,7 @@ private fun TitleAndMetaBlock(event: Event, modifier: Modifier = Modifier) {
                 ) {
                     Text(
                         text = "FREE",
+                        modifier = Modifier.fillMaxWidth(),
                         color = Color.White,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
@@ -670,6 +673,7 @@ private fun TitleAndMetaBlock(event: Event, modifier: Modifier = Modifier) {
                 ) {
                     Text(
                         text = event.priceInfo,
+                        modifier = Modifier.fillMaxWidth(),
                         color = Color.White,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
@@ -701,54 +705,24 @@ private fun MetaPill(
         )
         Text(
             text = label,
+            modifier = Modifier.widthIn(max = 220.dp),
             color = ContentGray,
             fontSize = 12.sp,
+            softWrap = true,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
     }
 }
 
-private val RatingProgressTrack = Color(0xFFE0E0E0)
-private val RatingSectionDivider = Color(0xFFF0F0F0)
-
 @Composable
-private fun RatingDistributionPlaceholder(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.widthIn(min = 100.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        for (stars in 5 downTo 1) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.rating_dist_star_n, stars),
-                    color = SubtitleGray,
-                    fontSize = 10.sp,
-                    modifier = Modifier.width(24.dp)
-                )
-                LinearProgressIndicator(
-                    progress = { 0f },
-                    modifier = Modifier
-                        .width(80.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp)),
-                    color = OrangeAccent,
-                    trackColor = RatingProgressTrack,
-                    strokeCap = StrokeCap.Round
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun VibeCheckSection(
+private fun VibeCheckBlock(
     event: Event,
-    uiState: EventDetailUiState,
+    myRating: Int?,
+    hasRated: Boolean,
+    isSubmitting: Boolean,
+    isUserSignedIn: Boolean,
+    isOwner: Boolean,
     onRatingSelected: (Int) -> Unit,
     onRemoveRating: () -> Unit,
     onRequestSignIn: () -> Unit,
@@ -759,7 +733,7 @@ private fun VibeCheckSection(
         delay(100L)
         visible = true
     }
-    val avg = event.rating ?: 0f
+    val rating = event.rating ?: 0f
     val count = event.ratingCount
 
     AnimatedVisibility(
@@ -767,8 +741,22 @@ private fun VibeCheckSection(
         enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 12 },
         modifier = modifier
     ) {
-        Column {
-            SectionHeader(stringResource(R.string.vibe_check).uppercase())
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.vibe_check).uppercase(),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = SubtitleGray,
+                letterSpacing = 0.8.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            )
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -776,60 +764,119 @@ private fun VibeCheckSection(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.Start
+                ) {
                     Text(
-                        text = if (count <= 0) "—" else "%.1f".format(avg),
-                        color = AppBarNavy,
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.Black
+                        text = if (count > 0) "%.1f".format(rating) else "--",
+                        fontSize = 44.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    ReadOnlyStarRating(
-                        rating = avg,
-                        ratingCount = count,
-                        starSize = 18.dp,
-                        showRatingCountLabel = false,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                    AnimatedContent(
-                        targetState = count,
-                        transitionSpec = {
-                            (slideInVertically { h -> h } + fadeIn()).togetherWith(
-                                slideOutVertically { h -> -h } + fadeOut()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        val filled = rating.toInt().coerceIn(0, 5)
+                        repeat(5) { index ->
+                            Icon(
+                                imageVector = if (index < filled) {
+                                    Icons.Filled.Star
+                                } else {
+                                    Icons.Outlined.Star
+                                },
+                                contentDescription = null,
+                                tint = if (index < filled) {
+                                    OrangeAccent
+                                } else {
+                                    SubtitleGray.copy(alpha = 0.4f)
+                                },
+                                modifier = Modifier.size(18.dp)
                             )
+                        }
+                    }
+                    Text(
+                        text = if (count > 0) {
+                            stringResource(R.string.rating_count_line, count)
+                        } else {
+                            "No ratings yet"
                         },
-                        label = "ratingCountAnim"
-                    ) { c ->
-                        Text(
-                            text = stringResource(R.string.rating_count_line, c),
-                            color = SubtitleGray,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
+                        fontSize = 12.sp,
+                        color = SubtitleGray,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp)
+                    )
+                }
+
+                if (count > 0) {
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        listOf(5, 4, 3, 2, 1).forEach { starLevel ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "$starLevel",
+                                    fontSize = 10.sp,
+                                    color = SubtitleGray,
+                                    modifier = Modifier.width(12.dp)
+                                )
+                                Icon(
+                                    imageVector = Icons.Filled.Star,
+                                    contentDescription = null,
+                                    tint = OrangeAccent,
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .padding(start = 2.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                LinearProgressIndicator(
+                                    progress = { 0f },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp)),
+                                    color = OrangeAccent,
+                                    trackColor = Color(0xFF2C3E6B),
+                                    strokeCap = StrokeCap.Round
+                                )
+                            }
+                        }
                     }
                 }
-                RatingDistributionPlaceholder()
             }
 
             HorizontalDivider(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
                 thickness = 1.dp,
-                color = RatingSectionDivider
+                color = Color.White.copy(alpha = 0.08f)
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
-
             when {
-                uiState.isOwner -> {
+                isOwner -> {
                     Text(
                         text = stringResource(R.string.rating_cannot_rate_own),
                         color = SubtitleGray,
                         fontSize = 12.sp,
-                        fontStyle = FontStyle.Italic
+                        fontStyle = FontStyle.Italic,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
-                !uiState.isUserSignedIn -> {
+                !isUserSignedIn -> {
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Lock,
@@ -841,9 +888,10 @@ private fun VibeCheckSection(
                             text = stringResource(R.string.rating_sign_in_to_rate),
                             color = SubtitleGray,
                             fontSize = 13.sp,
-                            modifier = Modifier.padding(start = 8.dp)
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 8.dp)
                         )
-                        Spacer(modifier = Modifier.weight(1f))
                         TextButton(onClick = onRequestSignIn) {
                             Text(
                                 text = stringResource(R.string.rating_sign_in_cta),
@@ -855,53 +903,137 @@ private fun VibeCheckSection(
                 }
                 else -> {
                     Text(
-                        text = if (uiState.hasRated) {
+                        text = if (hasRated) {
                             stringResource(R.string.rating_your_rating_header)
                         } else {
                             stringResource(R.string.rating_rate_experience)
                         },
-                        color = AppBarNavy,
+                        color = Color.White,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
                     )
 
-                    InteractiveStarRating(
-                        currentRating = uiState.myRating,
-                        displayRating = avg,
-                        isSubmitting = uiState.isSubmittingRating,
-                        onRatingSelected = onRatingSelected,
-                        onRemoveRating = onRemoveRating,
-                        tapToRateLabel = stringResource(R.string.rating_tap_to_rate),
-                        removeLabel = stringResource(R.string.rating_remove),
-                        yourRatedSuffix = uiState.myRating?.let { stars ->
-                            stringResource(R.string.rating_you_rated_fmt, stars)
-                        }.orEmpty(),
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        repeat(5) { index ->
+                            val isFilled = index < (myRating ?: 0)
+                            val scale by animateFloatAsState(
+                                targetValue = if (isFilled) 1.15f else 1f,
+                                animationSpec = androidx.compose.animation.core.spring(
+                                    stiffness = 600f,
+                                    dampingRatio = 0.4f
+                                ),
+                                label = "ratingStarScale$index"
+                            )
+                            IconButton(
+                                onClick = {
+                                    if (!isSubmitting) onRatingSelected(index + 1)
+                                },
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
+                            ) {
+                                if (isSubmitting && index < (myRating ?: 0)) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        color = OrangeAccent,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = if (isFilled) {
+                                            Icons.Filled.Star
+                                        } else {
+                                            Icons.Outlined.Star
+                                        },
+                                        contentDescription = "${index + 1} stars",
+                                        tint = if (isFilled) {
+                                            OrangeAccent
+                                        } else {
+                                            SubtitleGray.copy(alpha = 0.4f)
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (myRating != null) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                tint = OrangeAccent,
+                                modifier = Modifier.size(14.dp),
+                                contentDescription = null
+                            )
+                            Text(
+                                text = stringResource(R.string.rating_you_rated_fmt, myRating),
+                                fontSize = 12.sp,
+                                color = SubtitleGray,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 6.dp)
+                            )
+                            TextButton(
+                                onClick = onRemoveRating,
+                                contentPadding = PaddingValues(horizontal = 8.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.rating_remove),
+                                    color = OrangeAccent,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = stringResource(R.string.rating_tap_to_rate),
+                                fontSize = 12.sp,
+                                color = SubtitleGray,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
 
                     AnimatedVisibility(
-                        visible = uiState.hasRated && uiState.myRating != null,
-                        enter = fadeIn(tween(250)) + slideInVertically(tween(250)) { it / 8 },
-                        modifier = Modifier.padding(top = 12.dp)
+                        visible = hasRated,
+                        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 })
                     ) {
                         Row(
                             modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp)
                                 .clip(RoundedCornerShape(20.dp))
-                                .background(FreeGreen.copy(alpha = 0.1f))
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                                .background(FreeGreen.copy(alpha = 0.12f))
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.CheckCircle,
                                 contentDescription = null,
                                 tint = FreeGreen,
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                             Text(
                                 text = stringResource(R.string.rating_submitted),
                                 color = FreeGreen,
-                                fontSize = 12.sp
+                                fontSize = 12.sp,
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
@@ -929,7 +1061,11 @@ private fun AboutBlock(event: Event, modifier: Modifier = Modifier) {
         enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 12 },
         modifier = modifier
     ) {
-        Column(modifier = Modifier.animateContentSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize()
+        ) {
             SectionHeader(stringResource(R.string.detail_section_about).uppercase())
             Text(
                 text = description,
@@ -937,7 +1073,8 @@ private fun AboutBlock(event: Event, modifier: Modifier = Modifier) {
                 fontSize = 15.sp,
                 lineHeight = 24.sp,
                 maxLines = if (expanded) Int.MAX_VALUE else 4,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
             )
             Text(
                 text = if (expanded) {
@@ -948,6 +1085,7 @@ private fun AboutBlock(event: Event, modifier: Modifier = Modifier) {
                 color = OrangeAccent,
                 fontSize = 13.sp,
                 modifier = Modifier
+                    .fillMaxWidth()
                     .padding(top = 6.dp)
                     .clickable(
                         interactionSource = interactionSource,
@@ -972,7 +1110,7 @@ private fun OrganizerBlock(event: Event, modifier: Modifier = Modifier) {
         enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 12 },
         modifier = modifier
     ) {
-        Column {
+        Column(modifier = Modifier.fillMaxWidth()) {
             SectionHeader(stringResource(R.string.detail_section_organizer).uppercase())
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -993,12 +1131,14 @@ private fun OrganizerBlock(event: Event, modifier: Modifier = Modifier) {
                 ) {
                     Text(
                         text = name,
+                        modifier = Modifier.fillMaxWidth(),
                         color = Color.White,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = stringResource(R.string.detail_organizer_role),
+                        modifier = Modifier.fillMaxWidth(),
                         color = ContentGray,
                         fontSize = 12.sp
                     )
@@ -1035,7 +1175,7 @@ private fun MapBlock(modifier: Modifier = Modifier) {
         enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 12 },
         modifier = modifier
     ) {
-        Column {
+        Column(modifier = Modifier.fillMaxWidth()) {
             SectionHeader(stringResource(R.string.location_title).uppercase())
             Box(
                 modifier = Modifier
@@ -1057,7 +1197,10 @@ private fun MapBlock(modifier: Modifier = Modifier) {
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Icon(
                         imageVector = Icons.Filled.Map,
                         contentDescription = null,
@@ -1068,7 +1211,9 @@ private fun MapBlock(modifier: Modifier = Modifier) {
                     Text(
                         text = stringResource(R.string.map_coming_soon),
                         color = ContentGray.copy(alpha = 0.6f),
-                        fontSize = 13.sp
+                        fontSize = 13.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

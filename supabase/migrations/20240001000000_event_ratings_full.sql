@@ -19,6 +19,25 @@ CREATE INDEX IF NOT EXISTS idx_event_ratings_event_id
 CREATE INDEX IF NOT EXISTS idx_event_ratings_user_id
   ON public.event_ratings (user_id);
 
+-- Repair existing tables created before this migration shape.
+ALTER TABLE public.event_ratings
+  ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'event_ratings_event_user_unique'
+  ) THEN
+    ALTER TABLE public.event_ratings
+      ADD CONSTRAINT event_ratings_event_user_unique
+      UNIQUE (event_id, user_id);
+  END IF;
+END;
+$$;
+
 ALTER TABLE public.events
   ADD COLUMN IF NOT EXISTS avg_rating    numeric(3,2) DEFAULT 0.0,
   ADD COLUMN IF NOT EXISTS rating_count  integer      DEFAULT 0;
