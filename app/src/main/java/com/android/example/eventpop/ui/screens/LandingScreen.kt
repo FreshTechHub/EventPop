@@ -49,7 +49,8 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material.icons.filled.TheaterComedy
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -72,14 +73,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.foundation.clickable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -104,7 +103,6 @@ import com.android.example.eventpop.ui.viewmodel.LandingViewModel
 private val PageBackground = Color(0xFFF4F6F9)
 private val LiveRed = Color(0xFFE53935)
 private val ChipBorder = Color(0xFFE0E0E0)
-private val AuthDivider = Color(0xFFF0F0F0)
 private val Shadow6 = Color(0x0F000000)
 private val Black5 = Color(0x0D000000)
 
@@ -214,7 +212,7 @@ fun LandingScreen(
                 }
             }
             item(key = "bottomPad") {
-                Spacer(Modifier.height(120.dp))
+                Spacer(Modifier.height(148.dp))
             }
         }
 
@@ -910,24 +908,11 @@ private fun LandingAuthBar(
     val context = LocalContext.current
     val termsUrl = stringResource(R.string.auth_terms_url)
     val privacyUrl = stringResource(R.string.auth_privacy_url)
-    val primaryInteraction = remember { MutableInteractionSource() }
-    val primaryPressed by primaryInteraction.collectIsPressedAsState()
-    val primaryScale by animateFloatAsState(
-        targetValue = if (primaryPressed) 0.97f else 1f,
-        animationSpec = spring(),
-        label = "primaryAuth"
-    )
-    val secondaryInteraction = remember { MutableInteractionSource() }
-    val secondaryPressed by secondaryInteraction.collectIsPressedAsState()
-    val secondaryScale by animateFloatAsState(
-        targetValue = if (secondaryPressed) 0.97f else 1f,
-        animationSpec = spring(),
-        label = "secondaryAuth"
-    )
+    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val buttonShape = RoundedCornerShape(14.dp)
 
     Box(
-        modifier = Modifier
-            .fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.BottomCenter
     ) {
         Column(
@@ -937,92 +922,75 @@ private fun LandingAuthBar(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(16.dp)
+                    .height(28.dp)
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.08f))
+                            colorStops = arrayOf(
+                                0f to Color.Transparent,
+                                1f to Color.Black.copy(alpha = 0.06f)
+                            )
                         )
                     )
             )
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .shadow(
+                        elevation = 18.dp,
+                        shape = sheetShape,
+                        ambientColor = Color.Black.copy(alpha = 0.07f),
+                        spotColor = Color.Black.copy(alpha = 0.12f),
+                        clip = false
+                    )
+                    .clip(sheetShape)
                     .background(CardBackground)
+                    .navigationBarsPadding()
+                    .padding(start = 20.dp, top = 18.dp, end = 20.dp, bottom = 14.dp)
             ) {
-                HorizontalDivider(thickness = 1.dp, color = AuthDivider)
-                Column(
+                Button(
+                    onClick = onRegister,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .height(52.dp),
+                    shape = buttonShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = OrangeAccent,
+                        contentColor = Color.White
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 3.dp,
+                        pressedElevation = 1.dp,
+                        disabledElevation = 0.dp
+                    ),
+                    contentPadding = ButtonDefaults.ContentPadding
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .graphicsLayer {
-                                scaleX = primaryScale
-                                scaleY = primaryScale
-                                transformOrigin = TransformOrigin(0.5f, 0.5f)
-                            }
-                            .height(52.dp)
-                            .shadow(
-                                4.dp,
-                                RoundedCornerShape(14.dp),
-                                spotColor = OrangeAccent.copy(alpha = 0.35f),
-                                ambientColor = OrangeAccent.copy(alpha = 0.35f)
-                            )
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(OrangeAccent)
-                            .clickable(
-                                interactionSource = primaryInteraction,
-                                indication = null,
-                                onClick = onRegister
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.landing_get_started),
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .graphicsLayer {
-                                scaleX = secondaryScale
-                                scaleY = secondaryScale
-                                transformOrigin = TransformOrigin(0.5f, 0.5f)
-                            }
-                            .height(48.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .border(BorderStroke(1.5.dp, AppBarNavy), RoundedCornerShape(14.dp))
-                            .clickable(
-                                interactionSource = secondaryInteraction,
-                                indication = null,
-                                onClick = onSignIn
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.landing_have_account),
-                            color = AppBarNavy,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    LandingLegalFooter(
-                        onTerms = {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(termsUrl)))
-                        },
-                        onPrivacy = {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(privacyUrl)))
-                        }
+                    Text(
+                        text = stringResource(R.string.landing_get_started),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
+                TextButton(
+                    onClick = onSignIn,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.textButtonColors(contentColor = AppBarNavy)
+                ) {
+                    Text(
+                        text = stringResource(R.string.landing_have_account),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                LandingLegalFooter(
+                    onTerms = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(termsUrl)))
+                    },
+                    onPrivacy = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(privacyUrl)))
+                    }
+                )
             }
         }
     }
@@ -1033,17 +1001,20 @@ private fun LandingLegalFooter(
     onTerms: () -> Unit,
     onPrivacy: () -> Unit
 ) {
+    val tertiaryMuted = SubtitleGray.copy(alpha = 0.82f)
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = stringResource(R.string.landing_legal_prefix),
-            color = SubtitleGray,
-            fontSize = 11.sp,
+            color = tertiaryMuted,
+            fontSize = 10.sp,
             textAlign = TextAlign.Center,
-            lineHeight = 16.sp
+            lineHeight = 14.sp,
+            letterSpacing = 0.15.sp
         )
+        Spacer(Modifier.height(4.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -1052,21 +1023,28 @@ private fun LandingLegalFooter(
             Text(
                 text = stringResource(R.string.auth_terms_service),
                 color = OrangeAccent,
-                fontSize = 11.sp,
-                textDecoration = TextDecoration.Underline,
-                modifier = Modifier.clickable(onClick = onTerms)
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable(onClick = onTerms)
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
             )
             Text(
                 text = stringResource(R.string.auth_terms_and),
-                color = SubtitleGray,
-                fontSize = 11.sp
+                color = tertiaryMuted,
+                fontSize = 10.sp,
+                modifier = Modifier.padding(horizontal = 2.dp)
             )
             Text(
                 text = stringResource(R.string.auth_terms_privacy),
                 color = OrangeAccent,
-                fontSize = 11.sp,
-                textDecoration = TextDecoration.Underline,
-                modifier = Modifier.clickable(onClick = onPrivacy)
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable(onClick = onPrivacy)
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
             )
         }
     }
