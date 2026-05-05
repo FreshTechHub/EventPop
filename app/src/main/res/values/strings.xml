@@ -208,6 +208,7 @@
     <string name="landing_live_subtitle">Events happening today</string>
     <string name="landing_see_all">See All</string>
     <string name="landing_live_badge">LIVE</string>
+    <string name="landing_live_empty">No events scheduled for today yet. Check back later or browse featured events below.</string>
     <string name="landing_browse_category">Browse by Category</string>
     <string name="landing_featured_title">Featured Events</string>
     <string name="landing_view_all">View All</string>

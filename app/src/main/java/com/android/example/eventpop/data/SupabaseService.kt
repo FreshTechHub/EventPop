@@ -12,6 +12,7 @@ import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.postgrest.rpc
 import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.storage.storage
 import kotlinx.coroutines.Dispatchers
@@ -248,6 +249,12 @@ object SupabaseService {
     )
 
     @Serializable
+    private data class HostQuotaRpcRow(
+        @SerialName("subscription_active") val subscriptionActive: Boolean = false,
+        @SerialName("hosted_event_count") val hostedEventCount: Long = 0L
+    )
+
+    @Serializable
     private data class EventIdRow(val id: String)
 
     @Serializable
@@ -296,6 +303,18 @@ object SupabaseService {
         val pg = postgrest ?: return@withContext null
         val uid = auth?.currentUserOrNull()?.id ?: return@withContext null
         try {
+            val rpcQuota = runCatching {
+                pg.rpc("get_host_event_quota").decodeList<HostQuotaRpcRow>().singleOrNull()
+            }.onFailure { e ->
+                Log.w("SupabaseService", "fetchHostQuotaRemote RPC: ${e.message}")
+            }.getOrNull()
+            if (rpcQuota != null) {
+                return@withContext HostEventQuota(
+                    subscriptionActive = rpcQuota.subscriptionActive,
+                    hostedEventCount = rpcQuota.hostedEventCount.toInt().coerceAtLeast(0)
+                )
+            }
+
             val subscribed = try {
                 pg["profiles"].select(columns = Columns.raw("subscription_active")) {
                     filter { eq("id", uid) }
@@ -309,8 +328,12 @@ object SupabaseService {
                     filter { eq("created_by", uid) }
                 }.decodeList<EventIdRow>().size
             } catch (e: Exception) {
-                Log.e("SupabaseService", "fetchHostQuotaRemote count: ${e.message}", e)
-                return@withContext null
+                Log.e(
+                    "SupabaseService",
+                    "fetchHostQuotaRemote count (using 0): ${e.message}",
+                    e
+                )
+                0
             }
             HostEventQuota(subscriptionActive = subscribed, hostedEventCount = count)
         } catch (e: Exception) {

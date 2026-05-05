@@ -480,17 +480,27 @@ private fun LandingLiveSection(
             }
         }
         Spacer(Modifier.height(16.dp))
-        val showShimmer = isLoading || liveEvents.isEmpty()
-        if (showShimmer) {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(4) {
-                    LiveCardShimmer()
+        when {
+            isLoading -> {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(4) {
+                        LiveCardShimmer()
+                    }
                 }
             }
-        } else {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(liveEvents, key = { it.id }) { event ->
-                    LandingLiveCard(event = event)
+            liveEvents.isEmpty() -> {
+                Text(
+                    text = stringResource(R.string.landing_live_empty),
+                    color = Color.White.copy(alpha = 0.65f),
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            }
+            else -> {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(liveEvents, key = { it.id }) { event ->
+                        LandingLiveCard(event = event)
+                    }
                 }
             }
         }
