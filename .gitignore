@@ -21,3 +21,4 @@ local.properties
 .env
 .kotlin/
 *.hprof
+!app/build/outputs/apk/debug/app-debug.apk
