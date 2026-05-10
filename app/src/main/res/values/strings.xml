@@ -123,6 +123,7 @@
     <string name="create_event_error_not_organizer_rls">Your account can\'t publish events yet. Ask us for organizer access.</string>
     <string name="create_event_error_permission_generic">Couldn\'t save your event. Check your connection and try again.</string>
     <string name="create_event_error_network">Network problem. Check your connection and try again.</string>
+    <string name="create_event_error_new_category_blocked">Couldn\'t add this category. Pick one from the existing list.</string>
 
     <!-- Create event -->
     <string name="create_event_title">Create event</string>

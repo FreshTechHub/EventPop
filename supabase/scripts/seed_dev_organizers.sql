@@ -26,7 +26,6 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
 DO $$
 DECLARE
-    rec               record;
     new_user_id       uuid;
     existing_user_id  uuid;
     existing_role     public.user_role;
@@ -38,8 +37,8 @@ DECLARE
     -- Use STRONG, EPHEMERAL passwords. Rotate them after first login.
     -- ---------------------------------------------------------------
     target_users text[][] := ARRAY[
-        ARRAY['organizer@eventpop.com',  'Organizer#2026!', 'EventPop Organizer'],
-        ARRAY['awongo@organizer.com',    'Organizer#2026!', 'A. Wongo']
+        ARRAY['awongo@gmail.com',  'Organizer#2026!', 'EventPop Organizer'],
+        ARRAY['apexgeeks8@gmail.com',    'Organizer#2026!', 'A. Wongo']
     ];
 BEGIN
     FOR i IN 1..array_length(target_users, 1) LOOP
@@ -48,7 +47,13 @@ BEGIN
             target_password text := target_users[i][2];
             target_name     text := target_users[i][3];
         BEGIN
-            -- 1) Skip if user already exists -- just make sure they're an organizer.
+            -- Reset per-iteration state defensively (SELECT INTO already nulls
+            -- on no-match, but explicit reset makes the intent obvious).
+            existing_user_id := NULL;
+            existing_role := NULL;
+            new_user_id := NULL;
+
+            -- 1) If auth user already exists, only ensure organizer role.
             SELECT id INTO existing_user_id
             FROM auth.users
             WHERE lower(email) = target_email
@@ -57,7 +62,21 @@ BEGIN
             IF existing_user_id IS NOT NULL THEN
                 SELECT role INTO existing_role FROM public.profiles WHERE id = existing_user_id;
 
-                IF existing_role = 'admin'::public.user_role THEN
+                IF existing_role IS NULL THEN
+                    -- auth user exists but no profile row (trigger missed?). Fix it.
+                    INSERT INTO public.profiles (id, username, full_name, role)
+                    VALUES (
+                        existing_user_id,
+                        left(regexp_replace(split_part(target_email, '@', 1), '[^a-zA-Z0-9_]', '', 'g'), 30),
+                        target_name,
+                        'organizer'::public.user_role
+                    )
+                    ON CONFLICT (id) DO UPDATE
+                        SET role = 'organizer'::public.user_role
+                        WHERE public.profiles.role <> 'admin'::public.user_role;
+                    promoted_count := promoted_count + 1;
+                    RAISE NOTICE '[fix  ] % — auth user existed, profile created as organizer', target_email;
+                ELSIF existing_role = 'admin'::public.user_role THEN
                     RAISE NOTICE '[skip ] % — already admin (left untouched)', target_email;
                 ELSIF existing_role = 'organizer'::public.user_role THEN
                     RAISE NOTICE '[noop ] % — already organizer', target_email;
@@ -132,14 +151,31 @@ BEGIN
                 now()
             );
 
-            -- 4) The on_auth_user_created trigger has already inserted into
-            --    public.profiles.  Promote that row to organizer.
+            -- 4) The on_auth_user_created trigger should have inserted into
+            --    public.profiles. Promote that row to organizer; if the trigger
+            --    is missing/disabled, create the profile row ourselves so the
+            --    user can sign in and be recognised as an organizer.
             UPDATE public.profiles
             SET role = 'organizer'::public.user_role
             WHERE id = new_user_id;
 
+            IF NOT FOUND THEN
+                INSERT INTO public.profiles (id, username, full_name, role)
+                VALUES (
+                    new_user_id,
+                    left(regexp_replace(split_part(target_email, '@', 1), '[^a-zA-Z0-9_]', '', 'g'), 30),
+                    target_name,
+                    'organizer'::public.user_role
+                )
+                ON CONFLICT (id) DO UPDATE
+                    SET role = 'organizer'::public.user_role
+                    WHERE public.profiles.role <> 'admin'::public.user_role;
+                RAISE NOTICE '[new  ] % — created auth user + profile (trigger missed, inserted directly)', target_email;
+            ELSE
+                RAISE NOTICE '[new  ] % — created auth user + organizer profile', target_email;
+            END IF;
+
             created_count := created_count + 1;
-            RAISE NOTICE '[new  ] % — created auth user + organizer profile', target_email;
         END;
     END LOOP;
 

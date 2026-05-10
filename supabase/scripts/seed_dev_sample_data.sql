@@ -5,9 +5,18 @@
 --
 -- Expects tables: public.areas, public.categories, public.events
 -- (FKs: events.area_id → areas.id, events.category_id → categories.id)
+-- Optional: public.events.avg_rating (added by ratings migration). If your
+-- project hasn't run that migration yet, comment out the avg_rating column +
+-- corresponding values in the events INSERT below.
 --
--- Idempotent: safe to re-run. Skips rows that already exist by primary key
--- or unique name.
+-- Idempotent: safe to re-run. Skips rows that already exist by primary key.
+--
+-- Notes on `created_by`:
+--   The events_set_created_by BEFORE INSERT trigger always overrides created_by
+--   from auth.uid(). In the SQL editor (postgres role) auth.uid() is NULL, so
+--   the seeded events end up with created_by = NULL. They will be visible in
+--   the public feed but **cannot** be edited/deleted via app RLS — that's by
+--   design for sample/demo data.
 --
 -- Does NOT insert auth.users / profiles / RSVPs (those need real auth users).
 -- =============================================================================
@@ -17,6 +26,8 @@ BEGIN;
 -- -----------------------------------------------------------------------------
 -- Areas (Kampala-focused labels used in the app)
 -- -----------------------------------------------------------------------------
+-- public.areas has only PRIMARY KEY (id) — no UNIQUE on name — so we conflict
+-- on id, not name. (Re-running this script with the same fixed ids is a no-op.)
 INSERT INTO public.areas (id, name) VALUES
   ('a0000001-0000-4000-8000-000000000001', 'Bugolobi'),
   ('a0000002-0000-4000-8000-000000000002', 'Kololo'),
@@ -26,7 +37,7 @@ INSERT INTO public.areas (id, name) VALUES
   ('a0000006-0000-4000-8000-000000000006', 'Entebbe'),
   ('a0000007-0000-4000-8000-000000000007', 'Jinja'),
   ('a0000008-0000-4000-8000-000000000008', 'Mbarara')
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
 -- Categories (names must match what the Android mapper expects:
@@ -39,11 +50,13 @@ INSERT INTO public.categories (id, name) VALUES
   ('c0000004-0000-4000-8000-000000000004', 'Art'),
   ('c0000005-0000-4000-8000-000000000005', 'Wellness'),
   ('c0000006-0000-4000-8000-000000000006', 'Venue')
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
 -- Events (fixed ids for stable deep links during dev)
 -- -----------------------------------------------------------------------------
+-- Schema reminder: public.events.date / start_time / end_time are TEXT.
+-- We seed ISO-formatted strings directly so PostgREST returns them as-is.
 INSERT INTO public.events (
   id,
   title,
@@ -54,7 +67,6 @@ INSERT INTO public.events (
   image_url,
   area_id,
   category_id,
-  organizer_id,
   avg_rating,
   price,
   date,
@@ -71,12 +83,11 @@ INSERT INTO public.events (
     NULL,
     (SELECT id FROM public.areas WHERE name = 'Bugolobi' LIMIT 1),
     (SELECT id FROM public.categories WHERE name = 'Food' LIMIT 1),
-    NULL,
     4.6,
     NULL,
-    (CURRENT_DATE + INTERVAL '3 day')::date,
-    '17:00'::time,
-    '21:00'::time
+    to_char(CURRENT_DATE + INTERVAL '3 day', 'YYYY-MM-DD'),
+    '17:00',
+    '21:00'
   ),
   (
     'e0000002-0000-4000-8000-000000000002',
@@ -88,12 +99,11 @@ INSERT INTO public.events (
     NULL,
     (SELECT id FROM public.areas WHERE name = 'Kololo' LIMIT 1),
     (SELECT id FROM public.categories WHERE name = 'Music' LIMIT 1),
-    NULL,
     4.4,
     10000,
-    (CURRENT_DATE + INTERVAL '5 day')::date,
-    '20:00'::time,
-    '23:00'::time
+    to_char(CURRENT_DATE + INTERVAL '5 day', 'YYYY-MM-DD'),
+    '20:00',
+    '23:00'
   ),
   (
     'e0000003-0000-4000-8000-000000000003',
@@ -105,12 +115,11 @@ INSERT INTO public.events (
     NULL,
     (SELECT id FROM public.areas WHERE name = 'Ntinda' LIMIT 1),
     (SELECT id FROM public.categories WHERE name = 'Music' LIMIT 1),
-    NULL,
     3.5,
     NULL,
-    (CURRENT_DATE + INTERVAL '6 day')::date,
-    '21:30'::time,
-    '02:00'::time
+    to_char(CURRENT_DATE + INTERVAL '6 day', 'YYYY-MM-DD'),
+    '21:30',
+    '02:00'
   ),
   (
     'e0000004-0000-4000-8000-000000000004',
@@ -122,12 +131,11 @@ INSERT INTO public.events (
     NULL,
     (SELECT id FROM public.areas WHERE name = 'Kyadondo' LIMIT 1),
     (SELECT id FROM public.categories WHERE name = 'Wellness' LIMIT 1),
-    NULL,
     4.8,
     5000,
-    (CURRENT_DATE + INTERVAL '1 day')::date,
-    '08:00'::time,
-    '09:30'::time
+    to_char(CURRENT_DATE + INTERVAL '1 day', 'YYYY-MM-DD'),
+    '08:00',
+    '09:30'
   ),
   (
     'e0000005-0000-4000-8000-000000000005',
@@ -139,12 +147,11 @@ INSERT INTO public.events (
     NULL,
     (SELECT id FROM public.areas WHERE name = 'Kololo' LIMIT 1),
     (SELECT id FROM public.categories WHERE name = 'Art' LIMIT 1),
-    NULL,
     4.2,
     NULL,
-    (CURRENT_DATE + INTERVAL '8 day')::date,
-    '10:00'::time,
-    '18:00'::time
+    to_char(CURRENT_DATE + INTERVAL '8 day', 'YYYY-MM-DD'),
+    '10:00',
+    '18:00'
   ),
   (
     'e0000006-0000-4000-8000-000000000006',
@@ -156,12 +163,11 @@ INSERT INTO public.events (
     NULL,
     (SELECT id FROM public.areas WHERE name = 'Wandegeya' LIMIT 1),
     (SELECT id FROM public.categories WHERE name = 'Comedy' LIMIT 1),
-    NULL,
     4.9,
     20000,
-    (CURRENT_DATE + INTERVAL '4 day')::date,
-    '19:00'::time,
-    '22:00'::time
+    to_char(CURRENT_DATE + INTERVAL '4 day', 'YYYY-MM-DD'),
+    '19:00',
+    '22:00'
   ),
   (
     'e0000007-0000-4000-8000-000000000007',
@@ -173,12 +179,11 @@ INSERT INTO public.events (
     NULL,
     (SELECT id FROM public.areas WHERE name = 'Kololo' LIMIT 1),
     (SELECT id FROM public.categories WHERE name = 'Venue' LIMIT 1),
-    NULL,
     4.3,
     15000,
-    (CURRENT_DATE + INTERVAL '2 day')::date,
-    '17:30'::time,
-    '21:00'::time
+    to_char(CURRENT_DATE + INTERVAL '2 day', 'YYYY-MM-DD'),
+    '17:30',
+    '21:00'
   ),
   (
     'e0000008-0000-4000-8000-000000000008',
@@ -190,12 +195,11 @@ INSERT INTO public.events (
     NULL,
     (SELECT id FROM public.areas WHERE name = 'Entebbe' LIMIT 1),
     (SELECT id FROM public.categories WHERE name = 'Art' LIMIT 1),
-    NULL,
     4.1,
     NULL,
-    (CURRENT_DATE + INTERVAL '10 day')::date,
-    '11:00'::time,
-    '17:00'::time
+    to_char(CURRENT_DATE + INTERVAL '10 day', 'YYYY-MM-DD'),
+    '11:00',
+    '17:00'
   ),
   (
     'e0000009-0000-4000-8000-000000000009',
@@ -207,12 +211,11 @@ INSERT INTO public.events (
     NULL,
     (SELECT id FROM public.areas WHERE name = 'Jinja' LIMIT 1),
     (SELECT id FROM public.categories WHERE name = 'Music' LIMIT 1),
-    NULL,
     4.7,
     12000,
-    (CURRENT_DATE + INTERVAL '12 day')::date,
-    '18:00'::time,
-    '21:30'::time
+    to_char(CURRENT_DATE + INTERVAL '12 day', 'YYYY-MM-DD'),
+    '18:00',
+    '21:30'
   ),
   (
     'e000000a-0000-4000-8000-00000000000a',
@@ -224,23 +227,30 @@ INSERT INTO public.events (
     NULL,
     (SELECT id FROM public.areas WHERE name = 'Mbarara' LIMIT 1),
     (SELECT id FROM public.categories WHERE name = 'Wellness' LIMIT 1),
-    NULL,
     4.0,
     NULL,
-    (CURRENT_DATE + INTERVAL '7 day')::date,
-    '07:00'::time,
-    '09:00'::time
+    to_char(CURRENT_DATE + INTERVAL '7 day', 'YYYY-MM-DD'),
+    '07:00',
+    '09:00'
   )
 ON CONFLICT (id) DO NOTHING;
 
 COMMIT;
 
 -- =============================================================================
+-- Optional: link a real auth user as the host of a seeded event so the
+-- "Hosting" tab in the app shows it. Replace the UUID and event id, then run.
+-- =============================================================================
+-- BEGIN;
+-- UPDATE public.events
+--   SET created_by = '<auth.users.id>'
+--   WHERE id = 'e0000001-0000-4000-8000-000000000001';
+-- COMMIT;
+--
+-- =============================================================================
 -- Optional: after you create a test user in Authentication, link a profile:
 -- =============================================================================
 -- INSERT INTO public.profiles (id, username, full_name)
 -- VALUES ('<auth.users id>', 'devuser', 'Dev User')
 -- ON CONFLICT (id) DO NOTHING;
---
--- Then you can set organizer_id on events or seed event_rsvps / event_interests.
 -- =============================================================================

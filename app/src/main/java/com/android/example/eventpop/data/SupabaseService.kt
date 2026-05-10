@@ -466,22 +466,19 @@ object SupabaseService {
         }
 
     @Serializable
-    private data class NameInsertBody(val name: String)
-
-    @Serializable
     private data class ImagePathRow(
         @SerialName("image_url") val imageUrl: String? = null
     )
 
-    private fun Throwable.isUniqueViolation(): Boolean {
-        val m = message.orEmpty()
-        return m.contains("23505", ignoreCase = true) ||
-            m.contains("duplicate key", ignoreCase = true) ||
-            m.contains("unique constraint", ignoreCase = true)
-    }
+    @Serializable
+    private data class EnsureLookupArgs(@SerialName("p_name") val name: String)
 
     /**
-     * Finds an existing [public.areas] row by exact [name], or inserts one (authenticated insert policy).
+     * Returns the [public.areas] id for [rawName], creating the row if missing.
+     *
+     * Uses the `public.ensure_area(text)` SECURITY DEFINER RPC so the upsert
+     * works regardless of RLS quirks on the underlying table — the function
+     * verifies organizer/admin role internally.
      */
     suspend fun resolveOrInsertAreaByName(rawName: String): Result<String?> =
         withContext(Dispatchers.IO) {
@@ -491,32 +488,22 @@ object SupabaseService {
             val name = rawName.trim()
             if (name.isEmpty()) return@withContext Result.success(null)
             runCatching {
-                val existing = pg["areas"].select(columns = Columns.raw("id")) {
-                    filter { eq("name", name) }
-                }.decodeList<EventIdRow>().firstOrNull()
-                if (existing != null) return@runCatching existing.id
-                try {
-                    pg["areas"].insert(NameInsertBody(name)) {
-                        select(Columns.raw("id"))
-                    }.decodeSingle<EventIdRow>().id
-                } catch (e: Exception) {
-                    if (e.isUniqueViolation()) {
-                        pg["areas"].select(columns = Columns.raw("id")) {
-                            filter { eq("name", name) }
-                        }.decodeList<EventIdRow>().firstOrNull()?.id
-                            ?: throw e
-                    } else {
-                        throw e
-                    }
-                }
+                pg.rpc("ensure_area", EnsureLookupArgs(name))
+                    .data
+                    .trim()
+                    .removeSurrounding("\"")
+                    .ifBlank { error("ensure_area returned empty id") }
             }.fold(
-                onSuccess = { Result.success(it) },
+                onSuccess = { Result.success<String?>(it) },
                 onFailure = { Result.failure(it) }
             )
         }
 
     /**
-     * Resolves [public.categories] id for this label (matches app [EventCategory.displayName]).
+     * Returns the [public.categories] id for [displayName], creating the row if missing.
+     *
+     * The mobile app no longer hits this from the publish path (the dropdown
+     * is fully DB-driven); kept for future admin tools / seeding.
      */
     suspend fun resolveOrInsertCategoryByDisplayName(displayName: String): Result<String> =
         withContext(Dispatchers.IO) {
@@ -528,24 +515,11 @@ object SupabaseService {
                 return@withContext Result.failure(IllegalStateException("Category name required"))
             }
             runCatching {
-                val existing = pg["categories"].select(columns = Columns.raw("id")) {
-                    filter { eq("name", name) }
-                }.decodeList<EventIdRow>().firstOrNull()
-                if (existing != null) return@runCatching existing.id
-                try {
-                    pg["categories"].insert(NameInsertBody(name)) {
-                        select(Columns.raw("id"))
-                    }.decodeSingle<EventIdRow>().id
-                } catch (e: Exception) {
-                    if (e.isUniqueViolation()) {
-                        pg["categories"].select(columns = Columns.raw("id")) {
-                            filter { eq("name", name) }
-                        }.decodeList<EventIdRow>().firstOrNull()?.id
-                            ?: throw e
-                    } else {
-                        throw e
-                    }
-                }
+                pg.rpc("ensure_category", EnsureLookupArgs(name))
+                    .data
+                    .trim()
+                    .removeSurrounding("\"")
+                    .ifBlank { error("ensure_category returned empty id") }
             }.fold(
                 onSuccess = { Result.success(it) },
                 onFailure = { Result.failure(it) }
