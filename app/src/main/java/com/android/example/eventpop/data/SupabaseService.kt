@@ -333,11 +333,13 @@ object SupabaseService {
     suspend fun fetchAreasRemote(): List<NamedLookupRow> = withContext(Dispatchers.IO) {
         val pg = postgrest ?: return@withContext emptyList()
         try {
-            pg["areas"].select(columns = Columns.raw("id,name")) {}
+            val rows = pg["areas"].select(columns = Columns.raw("id,name")) {}
                 .decodeList<IdNameRow>().map { NamedLookupRow(id = it.id, name = it.name) }
                 .sortedBy { it.name }
+            Log.i("SupabaseService", "fetchAreasRemote: ${rows.size} rows")
+            rows
         } catch (e: Exception) {
-            Log.e("SupabaseService", "fetchAreasRemote: ${e.message}", e)
+            Log.e("SupabaseService", "fetchAreasRemote failed: ${e.message}", e)
             emptyList()
         }
     }
@@ -345,11 +347,13 @@ object SupabaseService {
     suspend fun fetchCategoriesRemote(): List<NamedLookupRow> = withContext(Dispatchers.IO) {
         val pg = postgrest ?: return@withContext emptyList()
         try {
-            pg["categories"].select(columns = Columns.raw("id,name")) {}
+            val rows = pg["categories"].select(columns = Columns.raw("id,name")) {}
                 .decodeList<IdNameRow>().map { NamedLookupRow(id = it.id, name = it.name) }
                 .sortedBy { it.name }
+            Log.i("SupabaseService", "fetchCategoriesRemote: ${rows.size} rows")
+            rows
         } catch (e: Exception) {
-            Log.e("SupabaseService", "fetchCategoriesRemote: ${e.message}", e)
+            Log.e("SupabaseService", "fetchCategoriesRemote failed: ${e.message}", e)
             emptyList()
         }
     }
