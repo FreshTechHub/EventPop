@@ -10,13 +10,18 @@ data class NamedLookupRow(
 
 /**
  * Hosting quota from [public.profiles] + count of [public.events] for [auth.uid].
+ *
+ * Mirrors `public.user_can_create_event()`: the only requirement to publish is
+ * having an organizer/admin [role]. [subscriptionActive] and [hostedEventCount]
+ * are kept for UI display (counters / future paywall) but no longer block.
  */
 data class HostEventQuota(
     val subscriptionActive: Boolean,
-    val hostedEventCount: Int
+    val hostedEventCount: Int,
+    val role: UserRole = UserRole.USER
 ) {
     val canCreateEvent: Boolean
-        get() = subscriptionActive || hostedEventCount < 2
+        get() = role.canCreateEvents
 }
 
 /**

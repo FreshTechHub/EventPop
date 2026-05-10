@@ -116,8 +116,51 @@ object SupabaseService {
             email = user.email,
             displayName = resolvedName,
             avatarUrl = avatarUrl,
-            isLoggedIn = true
+            isLoggedIn = true,
+            role = cachedRole
         )
+    }
+
+    /**
+     * In-memory cache of the caller's RBAC role. Refreshed by [fetchCurrentUserRoleRemote] /
+     * [fetchHostQuotaRemote]. Defaults to [UserRole.USER] so the app is safe by default
+     * before the first server round-trip.
+     */
+    @Volatile
+    private var cachedRole: UserRole = UserRole.USER
+
+    fun cachedUserRole(): UserRole = cachedRole
+
+    fun clearCachedUserRole() {
+        cachedRole = UserRole.USER
+    }
+
+    /**
+     * Server-of-truth fetch for the caller's role. Hits the [public.get_my_role] RPC.
+     * Falls back to a direct select on [public.profiles] if the RPC is unavailable.
+     */
+    suspend fun fetchCurrentUserRoleRemote(): UserRole = withContext(Dispatchers.IO) {
+        val pg = postgrest ?: return@withContext UserRole.USER
+        val uid = auth?.currentUserOrNull()?.id ?: return@withContext UserRole.USER
+        val resolved = runCatching {
+            val raw = pg.rpc("get_my_role").data
+            val cleaned = raw.trim().removeSurrounding("\"").removeSurrounding("'")
+            UserRole.fromWire(cleaned)
+        }.getOrElse { rpcErr ->
+            Log.w("SupabaseService", "fetchCurrentUserRoleRemote RPC: ${rpcErr.message}")
+            runCatching {
+                pg["profiles"].select(columns = Columns.raw("role")) {
+                    filter { eq("id", uid) }
+                }.decodeList<ProfileRoleRow>().singleOrNull()?.role
+                    ?.let(UserRole::fromWire)
+                    ?: UserRole.USER
+            }.getOrElse { e ->
+                Log.w("SupabaseService", "fetchCurrentUserRoleRemote profile: ${e.message}")
+                UserRole.USER
+            }
+        }
+        cachedRole = resolved
+        resolved
     }
 
     suspend fun signOut() {
@@ -249,9 +292,21 @@ object SupabaseService {
     )
 
     @Serializable
+    private data class ProfileRoleRow(
+        val role: String? = null
+    )
+
+    @Serializable
+    private data class ProfileSubscriptionAndRoleRow(
+        @SerialName("subscription_active") val subscriptionActive: Boolean = false,
+        val role: String? = null
+    )
+
+    @Serializable
     private data class HostQuotaRpcRow(
         @SerialName("subscription_active") val subscriptionActive: Boolean = false,
-        @SerialName("hosted_event_count") val hostedEventCount: Long = 0L
+        @SerialName("hosted_event_count") val hostedEventCount: Long = 0L,
+        val role: String? = null
     )
 
     @Serializable
@@ -278,11 +333,13 @@ object SupabaseService {
     suspend fun fetchAreasRemote(): List<NamedLookupRow> = withContext(Dispatchers.IO) {
         val pg = postgrest ?: return@withContext emptyList()
         try {
-            pg["areas"].select(columns = Columns.raw("id,name")) {}
+            val rows = pg["areas"].select(columns = Columns.raw("id,name")) {}
                 .decodeList<IdNameRow>().map { NamedLookupRow(id = it.id, name = it.name) }
                 .sortedBy { it.name }
+            Log.i("SupabaseService", "fetchAreasRemote: ${rows.size} rows")
+            rows
         } catch (e: Exception) {
-            Log.e("SupabaseService", "fetchAreasRemote: ${e.message}", e)
+            Log.e("SupabaseService", "fetchAreasRemote failed: ${e.message}", e)
             emptyList()
         }
     }
@@ -290,11 +347,13 @@ object SupabaseService {
     suspend fun fetchCategoriesRemote(): List<NamedLookupRow> = withContext(Dispatchers.IO) {
         val pg = postgrest ?: return@withContext emptyList()
         try {
-            pg["categories"].select(columns = Columns.raw("id,name")) {}
+            val rows = pg["categories"].select(columns = Columns.raw("id,name")) {}
                 .decodeList<IdNameRow>().map { NamedLookupRow(id = it.id, name = it.name) }
                 .sortedBy { it.name }
+            Log.i("SupabaseService", "fetchCategoriesRemote: ${rows.size} rows")
+            rows
         } catch (e: Exception) {
-            Log.e("SupabaseService", "fetchCategoriesRemote: ${e.message}", e)
+            Log.e("SupabaseService", "fetchCategoriesRemote failed: ${e.message}", e)
             emptyList()
         }
     }
@@ -309,20 +368,25 @@ object SupabaseService {
                 Log.w("SupabaseService", "fetchHostQuotaRemote RPC: ${e.message}")
             }.getOrNull()
             if (rpcQuota != null) {
+                val role = UserRole.fromWire(rpcQuota.role)
+                cachedRole = role
                 return@withContext HostEventQuota(
                     subscriptionActive = rpcQuota.subscriptionActive,
-                    hostedEventCount = rpcQuota.hostedEventCount.toInt().coerceAtLeast(0)
+                    hostedEventCount = rpcQuota.hostedEventCount.toInt().coerceAtLeast(0),
+                    role = role
                 )
             }
 
-            val subscribed = try {
-                pg["profiles"].select(columns = Columns.raw("subscription_active")) {
+            val (subscribed, role) = try {
+                val row = pg["profiles"].select(columns = Columns.raw("subscription_active,role")) {
                     filter { eq("id", uid) }
-                }.decodeList<ProfileSubscriptionRemote>().singleOrNull()?.subscriptionActive == true
+                }.decodeList<ProfileSubscriptionAndRoleRow>().singleOrNull()
+                (row?.subscriptionActive == true) to UserRole.fromWire(row?.role)
             } catch (e: Exception) {
                 Log.w("SupabaseService", "fetchHostQuotaRemote profile: ${e.message}")
-                false
+                false to UserRole.USER
             }
+            cachedRole = role
             val count = try {
                 pg["events"].select(columns = Columns.raw("id")) {
                     filter { eq("created_by", uid) }
@@ -335,7 +399,11 @@ object SupabaseService {
                 )
                 0
             }
-            HostEventQuota(subscriptionActive = subscribed, hostedEventCount = count)
+            HostEventQuota(
+                subscriptionActive = subscribed,
+                hostedEventCount = count,
+                role = role
+            )
         } catch (e: Exception) {
             Log.e("SupabaseService", "fetchHostQuotaRemote: ${e.message}", e)
             null
@@ -402,22 +470,19 @@ object SupabaseService {
         }
 
     @Serializable
-    private data class NameInsertBody(val name: String)
-
-    @Serializable
     private data class ImagePathRow(
         @SerialName("image_url") val imageUrl: String? = null
     )
 
-    private fun Throwable.isUniqueViolation(): Boolean {
-        val m = message.orEmpty()
-        return m.contains("23505", ignoreCase = true) ||
-            m.contains("duplicate key", ignoreCase = true) ||
-            m.contains("unique constraint", ignoreCase = true)
-    }
+    @Serializable
+    private data class EnsureLookupArgs(@SerialName("p_name") val name: String)
 
     /**
-     * Finds an existing [public.areas] row by exact [name], or inserts one (authenticated insert policy).
+     * Returns the [public.areas] id for [rawName], creating the row if missing.
+     *
+     * Uses the `public.ensure_area(text)` SECURITY DEFINER RPC so the upsert
+     * works regardless of RLS quirks on the underlying table — the function
+     * verifies organizer/admin role internally.
      */
     suspend fun resolveOrInsertAreaByName(rawName: String): Result<String?> =
         withContext(Dispatchers.IO) {
@@ -427,32 +492,22 @@ object SupabaseService {
             val name = rawName.trim()
             if (name.isEmpty()) return@withContext Result.success(null)
             runCatching {
-                val existing = pg["areas"].select(columns = Columns.raw("id")) {
-                    filter { eq("name", name) }
-                }.decodeList<EventIdRow>().firstOrNull()
-                if (existing != null) return@runCatching existing.id
-                try {
-                    pg["areas"].insert(NameInsertBody(name)) {
-                        select(Columns.raw("id"))
-                    }.decodeSingle<EventIdRow>().id
-                } catch (e: Exception) {
-                    if (e.isUniqueViolation()) {
-                        pg["areas"].select(columns = Columns.raw("id")) {
-                            filter { eq("name", name) }
-                        }.decodeList<EventIdRow>().firstOrNull()?.id
-                            ?: throw e
-                    } else {
-                        throw e
-                    }
-                }
+                pg.rpc("ensure_area", EnsureLookupArgs(name))
+                    .data
+                    .trim()
+                    .removeSurrounding("\"")
+                    .ifBlank { error("ensure_area returned empty id") }
             }.fold(
-                onSuccess = { Result.success(it) },
+                onSuccess = { Result.success<String?>(it) },
                 onFailure = { Result.failure(it) }
             )
         }
 
     /**
-     * Resolves [public.categories] id for this label (matches app [EventCategory.displayName]).
+     * Returns the [public.categories] id for [displayName], creating the row if missing.
+     *
+     * The mobile app no longer hits this from the publish path (the dropdown
+     * is fully DB-driven); kept for future admin tools / seeding.
      */
     suspend fun resolveOrInsertCategoryByDisplayName(displayName: String): Result<String> =
         withContext(Dispatchers.IO) {
@@ -464,24 +519,11 @@ object SupabaseService {
                 return@withContext Result.failure(IllegalStateException("Category name required"))
             }
             runCatching {
-                val existing = pg["categories"].select(columns = Columns.raw("id")) {
-                    filter { eq("name", name) }
-                }.decodeList<EventIdRow>().firstOrNull()
-                if (existing != null) return@runCatching existing.id
-                try {
-                    pg["categories"].insert(NameInsertBody(name)) {
-                        select(Columns.raw("id"))
-                    }.decodeSingle<EventIdRow>().id
-                } catch (e: Exception) {
-                    if (e.isUniqueViolation()) {
-                        pg["categories"].select(columns = Columns.raw("id")) {
-                            filter { eq("name", name) }
-                        }.decodeList<EventIdRow>().firstOrNull()?.id
-                            ?: throw e
-                    } else {
-                        throw e
-                    }
-                }
+                pg.rpc("ensure_category", EnsureLookupArgs(name))
+                    .data
+                    .trim()
+                    .removeSurrounding("\"")
+                    .ifBlank { error("ensure_category returned empty id") }
             }.fold(
                 onSuccess = { Result.success(it) },
                 onFailure = { Result.failure(it) }
@@ -548,6 +590,24 @@ object SupabaseService {
             rows.map { it.toEvent().withResolvedStorageImage(StorageBuckets.EVENT_IMAGES) }
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error fetching events", e)
+            null
+        }
+    }
+
+    /**
+     * Events created by the signed-in user ([public.events.created_by]).
+     * Empty list when not signed in; null only on transport failure.
+     */
+    suspend fun fetchHostedEventsForCurrentUser(): List<Event>? = withContext(Dispatchers.IO) {
+        val uid = auth?.currentUserOrNull()?.id ?: return@withContext emptyList()
+        try {
+            val rows = loadEventRows(eventsSelectColumns) {
+                eq("created_by", uid)
+            }
+            if (postgrest == null) return@withContext null
+            rows.map { it.toEvent().withResolvedStorageImage(StorageBuckets.EVENT_IMAGES) }
+        } catch (e: Exception) {
+            Log.e("SupabaseService", "fetchHostedEventsForCurrentUser: ${e.message}", e)
             null
         }
     }

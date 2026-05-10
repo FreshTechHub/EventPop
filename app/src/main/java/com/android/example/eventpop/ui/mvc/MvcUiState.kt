@@ -2,6 +2,7 @@ package com.android.example.eventpop.ui.mvc
 
 import androidx.compose.runtime.Immutable
 import com.android.example.eventpop.data.Event
+import com.android.example.eventpop.data.UserRole
 
 /**
  * Immutable presentation models for **View** layers (Compose).
@@ -61,6 +62,15 @@ data class FavoritesUiState(
 )
 
 @Immutable
+data class HostedEventsUiState(
+    val events: List<Event> = emptyList(),
+    val isLoading: Boolean = false,
+    val needsSignIn: Boolean = false,
+    /** True when signed in but not an organizer — hide list and show empty state. */
+    val needsOrganizerRole: Boolean = false
+)
+
+@Immutable
 data class ProfileUiState(
     val email: String = "",
     val displayName: String = "Guest",
@@ -72,5 +82,9 @@ data class ProfileUiState(
     val avatarUploadProgress: Float = 0f,
     val successMessage: String? = null,
     val errorMessage: String? = null,
-    val snackbarRetryable: Boolean = false
-)
+    val snackbarRetryable: Boolean = false,
+    val role: UserRole = UserRole.USER
+) {
+    val canCreateEvents: Boolean
+        get() = isLoggedIn && role.canCreateEvents
+}

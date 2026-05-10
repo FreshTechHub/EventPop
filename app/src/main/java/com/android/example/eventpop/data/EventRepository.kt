@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import com.android.example.eventpop.data.local.EventDao
 import com.android.example.eventpop.data.local.EventEntity
-import com.android.example.eventpop.data.EventCategory
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -71,17 +70,32 @@ class EventRepository(
         SupabaseService.setEventInterested(eventId, interested)
 
     /**
-     * Categories shown when hosting an event: app [EventCategory] list (synced to Supabase on publish).
+     * Categories shown when hosting an event. Sourced from `public.categories` so admins
+     * can manage them server-side without an app release. Returned ids are real row UUIDs
+     * and feed straight into [CreateEventSubmission.categoryId] — no further resolve step
+     * is needed. Returns an empty list if the table is empty or the network call failed;
+     * the caller (CreateEventViewModel) surfaces an explicit error in that case rather
+     * than fabricating fake ids that would later poison the events insert.
      */
-    fun createEventCategoryOptions(): List<NamedLookupRow> =
-        EventCategory.entries.map { NamedLookupRow(id = it.name, name = it.displayName) }
+    suspend fun createEventCategoryOptions(): List<NamedLookupRow> =
+        SupabaseService.fetchCategoriesRemote()
 
     suspend fun fetchCreateEventLookups(): Pair<List<NamedLookupRow>, List<NamedLookupRow>> {
         val categories = createEventCategoryOptions()
         return emptyList<NamedLookupRow>() to categories
     }
 
-    suspend fun fetchHostQuota(): HostEventQuota? = SupabaseService.fetchHostQuotaRemote()
+    suspend fun fetchHostQuota(): HostEventQuota? {
+        val q = SupabaseService.fetchHostQuotaRemote()
+        q?.let { AuthRepository.publishRole(it.role) }
+        return q
+    }
+
+    /**
+     * Events where [Event.createdBy] is the current user (from Supabase).
+     */
+    suspend fun fetchHostedEventsForCurrentUser(): List<Event>? =
+        SupabaseService.fetchHostedEventsForCurrentUser()
 
     suspend fun createEvent(submission: CreateEventSubmission): Result<Event> {
         val result = SupabaseService.insertEventRemote(submission)
@@ -125,9 +139,6 @@ class EventRepository(
 
     suspend fun resolveAreaIdForSubmission(rawName: String): Result<String?> =
         SupabaseService.resolveOrInsertAreaByName(rawName)
-
-    suspend fun resolveCategoryIdForSubmission(displayName: String): Result<String> =
-        SupabaseService.resolveOrInsertCategoryByDisplayName(displayName)
 
     /**
      * Uploads to `event-images` under `{userId}/{uuid}.ext`. Returns the **storage object path**

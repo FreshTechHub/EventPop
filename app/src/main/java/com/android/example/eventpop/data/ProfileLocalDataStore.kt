@@ -22,6 +22,7 @@ object ProfileKeys {
     val AVATAR_LOCAL = stringPreferencesKey("profile_avatar_local_path")
     val LAST_SYNCED = longPreferencesKey("profile_last_synced")
     val PENDING_SYNC = booleanPreferencesKey("profile_pending_sync")
+    val ROLE = stringPreferencesKey("profile_role")
 }
 
 data class LocalProfile(
@@ -30,7 +31,8 @@ data class LocalProfile(
     val avatarUrl: String = "",
     val avatarLocalPath: String = "",
     val lastSyncedEpochMillis: Long = 0L,
-    val pendingSync: Boolean = false
+    val pendingSync: Boolean = false,
+    val role: UserRole = UserRole.USER
 )
 
 class ProfileLocalDataStore(context: Context) {
@@ -44,7 +46,8 @@ class ProfileLocalDataStore(context: Context) {
             avatarUrl = prefs[ProfileKeys.AVATAR_URL].orEmpty(),
             avatarLocalPath = prefs[ProfileKeys.AVATAR_LOCAL].orEmpty(),
             lastSyncedEpochMillis = prefs[ProfileKeys.LAST_SYNCED] ?: 0L,
-            pendingSync = prefs[ProfileKeys.PENDING_SYNC] == true
+            pendingSync = prefs[ProfileKeys.PENDING_SYNC] == true,
+            role = UserRole.fromWire(prefs[ProfileKeys.ROLE])
         )
     }
 
@@ -60,6 +63,7 @@ class ProfileLocalDataStore(context: Context) {
             prefs[ProfileKeys.AVATAR_LOCAL] = profile.avatarLocalPath
             prefs[ProfileKeys.LAST_SYNCED] = profile.lastSyncedEpochMillis
             prefs[ProfileKeys.PENDING_SYNC] = profile.pendingSync
+            prefs[ProfileKeys.ROLE] = profile.role.wire
         }
     }
 
@@ -69,7 +73,8 @@ class ProfileLocalDataStore(context: Context) {
         avatarUrl: String? = null,
         avatarLocalPath: String? = null,
         lastSyncedEpochMillis: Long? = null,
-        pendingSync: Boolean? = null
+        pendingSync: Boolean? = null,
+        role: UserRole? = null
     ) {
         dataStore.edit { prefs ->
             displayName?.let { prefs[ProfileKeys.DISPLAY_NAME] = it }
@@ -78,6 +83,7 @@ class ProfileLocalDataStore(context: Context) {
             avatarLocalPath?.let { prefs[ProfileKeys.AVATAR_LOCAL] = it }
             lastSyncedEpochMillis?.let { prefs[ProfileKeys.LAST_SYNCED] = it }
             pendingSync?.let { prefs[ProfileKeys.PENDING_SYNC] = it }
+            role?.let { prefs[ProfileKeys.ROLE] = it.wire }
         }
     }
 

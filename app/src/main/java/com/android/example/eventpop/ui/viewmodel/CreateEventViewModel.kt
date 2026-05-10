@@ -5,14 +5,16 @@ import android.app.Application
 import android.content.Context
 import android.location.LocationManager
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.android.example.eventpop.R
 import com.android.example.eventpop.data.AuthRepository
 import com.android.example.eventpop.data.CreateEventSubmission
-import com.android.example.eventpop.data.EventCategory
 import com.android.example.eventpop.data.EventLocationData
 import com.android.example.eventpop.data.EventRepository
 import com.android.example.eventpop.data.GeoLatLon
+import com.android.example.eventpop.data.NamedLookupRow
 import com.android.example.eventpop.data.NominatimClient
 import com.android.example.eventpop.data.NominatimRateLimitException
 import com.android.example.eventpop.data.NominatimResult
@@ -29,6 +31,13 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import javax.net.ssl.SSLHandshakeException
+
+private const val LOG_TAG = "EventPopCreateEvent"
 
 class CreateEventViewModel(
     application: Application,
@@ -107,7 +116,8 @@ class CreateEventViewModel(
                                 "Could not verify your hosting limit. Try again."
                         },
                         categories = categories,
-                        subscribeGate = false
+                        subscribeGate = false,
+                        hostRole = AuthRepository.cachedRole()
                     )
                 }
                 return@launch
@@ -122,7 +132,8 @@ class CreateEventViewModel(
                             isLoadingMeta = false,
                             metaError = "Could not load that event.",
                             categories = categories,
-                            subscribeGate = false
+                            subscribeGate = false,
+                            hostRole = quota.role
                         )
                     }
                     return@launch
@@ -134,7 +145,8 @@ class CreateEventViewModel(
                             isLoadingMeta = false,
                             metaError = "You can only edit your own events.",
                             categories = categories,
-                            subscribeGate = false
+                            subscribeGate = false,
+                            hostRole = quota.role
                         )
                     }
                     return@launch
@@ -156,6 +168,7 @@ class CreateEventViewModel(
                     }
                     else -> ""
                 }
+                val matchedCategoryId = matchCategoryId(categories, ev.category.displayName)
                 _uiState.update { prev ->
                     prev.copy(
                         isLoadingMeta = false,
@@ -163,6 +176,7 @@ class CreateEventViewModel(
                         categories = categories,
                         hostedCount = quota.hostedEventCount,
                         subscriptionActive = quota.subscriptionActive,
+                        hostRole = quota.role,
                         subscribeGate = false,
                         editingEventId = editId,
                         rsvpCountForEdit = ev.rsvpCount ?: 0,
@@ -174,7 +188,7 @@ class CreateEventViewModel(
                         startTimeText = ev.startTime.orEmpty(),
                         endTimeText = ev.endTime.orEmpty(),
                         areaText = ev.area.orEmpty(),
-                        selectedCategoryId = ev.category.name,
+                        selectedCategoryId = matchedCategoryId ?: categories.firstOrNull()?.id,
                         locationData = loc,
                         coverStoragePath = rawPath?.takeIf { !it.startsWith("http", ignoreCase = true) },
                         coverImageLabel = rawPath?.substringAfterLast('/'),
@@ -188,15 +202,28 @@ class CreateEventViewModel(
             _uiState.update {
                 it.copy(
                     isLoadingMeta = false,
-                    metaError = null,
+                    metaError = if (categories.isEmpty()) {
+                        "No categories available. Please try again later."
+                    } else {
+                        null
+                    },
                     categories = categories,
                     hostedCount = quota.hostedEventCount,
                     subscriptionActive = quota.subscriptionActive,
+                    hostRole = quota.role,
                     subscribeGate = gate,
-                    selectedCategoryId = it.selectedCategoryId ?: categories.firstOrNull()?.id
+                    selectedCategoryId = it.selectedCategoryId
+                        ?.takeIf { id -> categories.any { c -> c.id == id } }
+                        ?: categories.firstOrNull()?.id
                 )
             }
         }
+    }
+
+    private fun matchCategoryId(options: List<NamedLookupRow>, displayName: String): String? {
+        val target = displayName.trim()
+        if (target.isEmpty()) return null
+        return options.firstOrNull { it.name.equals(target, ignoreCase = true) }?.id
     }
 
     fun setTitle(value: String) = _uiState.update { it.copy(title = value, fieldErrors = it.fieldErrors.copy(title = null)) }
@@ -383,33 +410,48 @@ class CreateEventViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isPublishing = true, publishError = null) }
 
+            val latestRole = AuthRepository.refreshRole()
+            _uiState.update { it.copy(hostRole = latestRole) }
+            Log.i(
+                LOG_TAG,
+                "publish start uid=${AuthRepository.currentUserId()} role=$latestRole " +
+                    "subscribed=${state.subscriptionActive} hostedCount=${state.hostedCount} " +
+                    "editing=${state.editingEventId != null} hasCover=${state.coverStoragePath != null}"
+            )
+
             val areaResolved = eventRepository.resolveAreaIdForSubmission(state.areaText).getOrElse { e ->
+                Log.e(LOG_TAG, "area resolve failed for '${state.areaText}'", e)
                 _uiState.update {
-                    it.copy(isPublishing = false, publishError = humanizePublishError(e.message))
+                    it.copy(
+                        isPublishing = false,
+                        publishError = humanizePublishError(e, failingTable = "areas")
+                    )
                 }
                 return@launch
             }
 
-            val catKey = categoryKey
-            if (catKey.isNullOrBlank()) {
+            val categoryResolved = state.categories.firstOrNull { it.id == categoryKey }?.id
+            if (categoryResolved.isNullOrBlank() || !looksLikeUuid(categoryResolved)) {
+                Log.e(
+                    LOG_TAG,
+                    "category guard rejected '$categoryResolved' (categories=${state.categories.size})"
+                )
                 _uiState.update {
-                    it.copy(isPublishing = false, publishError = "Choose a category.")
+                    it.copy(
+                        isPublishing = false,
+                        publishError = if (state.categories.isEmpty()) {
+                            "No categories available yet. Try again later."
+                        } else {
+                            "Choose a category."
+                        }
+                    )
                 }
                 return@launch
             }
-            val catEnum = runCatching { EventCategory.valueOf(catKey) }.getOrElse {
-                _uiState.update {
-                    it.copy(isPublishing = false, publishError = "Choose a category.")
-                }
-                return@launch
-            }
-            val categoryResolved = eventRepository.resolveCategoryIdForSubmission(catEnum.displayName)
-                .getOrElse { e ->
-                    _uiState.update {
-                        it.copy(isPublishing = false, publishError = humanizePublishError(e.message))
-                    }
-                    return@launch
-                }
+            Log.i(
+                LOG_TAG,
+                "publish resolved area=$areaResolved category=$categoryResolved title='${title.take(40)}'"
+            )
 
             val imagePathOrUrl = state.coverStoragePath
                 ?: state.editingEventId?.let { eventRepository.fetchEventImagePathRemote(it) }
@@ -438,6 +480,8 @@ class CreateEventViewModel(
             } else {
                 eventRepository.createEvent(submission)
             }
+            result.onSuccess { Log.i(LOG_TAG, "publish ok id=${it.id}") }
+            result.onFailure { Log.e(LOG_TAG, "publish remote call failed", it) }
             val quotaAfter = if (editId == null) eventRepository.fetchHostQuota() else null
             _uiState.update { s ->
                 result.fold(
@@ -446,13 +490,15 @@ class CreateEventViewModel(
                             isPublishing = false,
                             navigateToEventId = event.id,
                             hostedCount = quotaAfter?.hostedEventCount ?: s.hostedCount,
+                            hostRole = quotaAfter?.role ?: s.hostRole,
                             subscribeGate = quotaAfter?.let { q -> !q.canCreateEvent } ?: s.subscribeGate
                         )
                     },
                     onFailure = { e ->
+                        Log.e(LOG_TAG, "publish failed", e)
                         s.copy(
                             isPublishing = false,
-                            publishError = humanizePublishError(e.message)
+                            publishError = humanizePublishError(e)
                         )
                     }
                 )
@@ -476,6 +522,11 @@ class CreateEventViewModel(
         if (s.matches(Regex("\\d{1,2}:\\d{2}\\s*(am|pm|AM|PM)"))) return true
         return false
     }
+
+    private val uuidRegex =
+        Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", RegexOption.IGNORE_CASE)
+
+    private fun looksLikeUuid(value: String): Boolean = uuidRegex.matches(value)
 
     /** Best-effort normalisation for Postgres time / text columns. */
     private fun normalizeTime(raw: String?): String? {
@@ -502,18 +553,124 @@ class CreateEventViewModel(
         return s
     }
 
-    private fun humanizePublishError(raw: String?): String {
-        val msg = raw.orEmpty()
-        return when {
-            msg.contains("42501", ignoreCase = true) ||
-                msg.contains("permission denied", ignoreCase = true) ||
-                msg.contains("new row violates row-level security", ignoreCase = true) ||
-                msg.contains("RLS", ignoreCase = true) ->
-                "You cannot publish more events on the free plan. Subscribe to continue hosting."
-            msg.contains("23503", ignoreCase = true) ->
-                "Invalid area or category. Refresh and try again."
-            msg.isNotBlank() -> msg
-            else -> "Could not publish. Try again."
+    private fun humanizePublishError(
+        error: Throwable?,
+        failingTable: String? = null
+    ): String {
+        val app = getApplication<Application>()
+        val combined = error.collectDiagnosticText()
+
+        // Server / DB / auth must win over heuristics — PostgREST and Ktor often put the word
+        // "timeout" or "I/O" in messages that are not device connectivity failures.
+        val rlsOrPg =
+            combined.contains("42501", ignoreCase = true) ||
+                combined.contains("permission denied", ignoreCase = true) ||
+                combined.contains("new row violates row-level security", ignoreCase = true) ||
+                combined.contains("violates row-level security policy", ignoreCase = true) ||
+                combined.contains("row-level security", ignoreCase = true) ||
+                combined.contains("RLS", ignoreCase = true) ||
+                combined.contains("PGRST", ignoreCase = true) ||
+                // Supabase Kotlin SDK class names for 403 (RLS) and 4xx server replies.
+                combined.contains("ForbiddenRestException", ignoreCase = true) ||
+                combined.contains("403 ", ignoreCase = true)
+        if (rlsOrPg) {
+            // Categories come from the DB (public.categories). Surface a specific message
+            // since users can only choose from the loaded list — they can't free-form type one.
+            val tableHint = failingTable
+                ?: when {
+                    combined.contains("for table \"categories\"", ignoreCase = true) ||
+                        combined.contains("on table \"categories\"", ignoreCase = true) ||
+                        combined.contains("/rest/v1/categories", ignoreCase = true) -> "categories"
+                    else -> null
+                }
+            if (tableHint == "categories") {
+                return app.getString(R.string.create_event_error_new_category_blocked)
+            }
+            // Areas are free-form for organizers; an RLS denial here means either the caller
+            // is not an organizer yet, or the lookup-insert migration is not applied. Route
+            // through the standard role-aware copy in both cases.
+            val st = _uiState.value
+            return if (!st.hostRole.canCreateEvents) {
+                app.getString(R.string.create_event_error_not_organizer_rls)
+            } else {
+                app.getString(R.string.create_event_error_permission_generic)
+            }
         }
+
+        if (combined.looksLikeUnauthorized()) {
+            return app.getString(R.string.create_event_error_permission_generic)
+        }
+
+        if (combined.contains("23503", ignoreCase = true)) {
+            return "Invalid area or category. Refresh and try again."
+        }
+
+        // Only classify as transport when we can prove it from a typed cause in the chain.
+        // Substring sniffing on text like "504" or "Read timed out" produced false positives
+        // for legitimate server replies, so we now rely on real exception types only.
+        if (error.hasTransportRootCause()) {
+            return app.getString(R.string.create_event_error_network)
+        }
+
+        // Fall back to the actual error text so we never lie about what went wrong.
+        val firstLine = combined.lineSequence().firstOrNull { it.isNotBlank() }?.take(500)
+        val single = error?.message?.trim()?.takeIf { it.isNotBlank() }?.take(500)
+        return single ?: firstLine ?: "Could not publish. Try again."
+    }
+
+    /**
+     * Full message text from this throwable and its causes. Includes [Throwable.toString] so
+     * PostgREST/Ktor `RestException` payloads (status + description) are not lost.
+     */
+    private fun Throwable?.collectDiagnosticText(): String {
+        if (this == null) return ""
+        val out = StringBuilder()
+        var t: Throwable? = this
+        var depth = 0
+        while (t != null && depth++ < 10) {
+            val name = t.javaClass.simpleName ?: ""
+            out.append(name).append(": ").append(t.message).append('\n')
+            // toString() often carries extra fields (e.g. error JSON description) the bare
+            // message does not.
+            val str = runCatching { t.toString() }.getOrNull()
+            if (!str.isNullOrBlank() && (t.message == null || !str.contains(t.message ?: ""))) {
+                out.append(str).append('\n')
+            }
+            t = t.cause
+        }
+        return out.toString()
+    }
+
+    private fun Throwable?.hasTransportRootCause(): Boolean {
+        var t: Throwable? = this
+        var depth = 0
+        while (t != null && depth++ < 12) {
+            when (t) {
+                is UnknownHostException,
+                is SocketTimeoutException,
+                is ConnectException,
+                is SSLHandshakeException -> return true
+                is IOException -> {
+                    val cn = t.javaClass.name
+                    if (cn.contains("Timeout", ignoreCase = true)) return true
+                }
+            }
+            val simple = t.javaClass.simpleName ?: ""
+            if (simple.contains("HttpRequestTimeout", ignoreCase = true)) return true
+            if (simple.contains("ConnectTimeout", ignoreCase = true)) return true
+            t = t.cause
+        }
+        return false
+    }
+
+    private fun String.looksLikeUnauthorized(): Boolean {
+        if (isBlank()) return false
+        return contains("UnauthorizedRestException", ignoreCase = true) ||
+            contains("401 ", ignoreCase = true) ||
+            contains(" 401", ignoreCase = true) ||
+            contains("JWT", ignoreCase = true) ||
+            contains("not authenticated", ignoreCase = true) ||
+            contains("invalid_grant", ignoreCase = true) ||
+            (contains("session", ignoreCase = true) && contains("expired", ignoreCase = true))
     }
 }
