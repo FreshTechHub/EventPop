@@ -127,6 +127,7 @@ class SignUpViewModel : ViewModel() {
                 AuthRepository.signUp(email, password, fullName)
             }
             _uiState.value = if (result.isSuccess) {
+                withContext(Dispatchers.IO) { AuthRepository.refreshRole() }
                 SignUpUiState.Success
             } else {
                 val msg = result.exceptionOrNull()?.message.orEmpty()

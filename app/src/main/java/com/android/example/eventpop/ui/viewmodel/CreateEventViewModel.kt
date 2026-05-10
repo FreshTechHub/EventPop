@@ -7,6 +7,7 @@ import android.location.LocationManager
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.android.example.eventpop.R
 import com.android.example.eventpop.data.AuthRepository
 import com.android.example.eventpop.data.CreateEventSubmission
 import com.android.example.eventpop.data.EventCategory
@@ -107,7 +108,8 @@ class CreateEventViewModel(
                                 "Could not verify your hosting limit. Try again."
                         },
                         categories = categories,
-                        subscribeGate = false
+                        subscribeGate = false,
+                        hostRole = AuthRepository.cachedRole()
                     )
                 }
                 return@launch
@@ -122,7 +124,8 @@ class CreateEventViewModel(
                             isLoadingMeta = false,
                             metaError = "Could not load that event.",
                             categories = categories,
-                            subscribeGate = false
+                            subscribeGate = false,
+                            hostRole = quota.role
                         )
                     }
                     return@launch
@@ -134,7 +137,8 @@ class CreateEventViewModel(
                             isLoadingMeta = false,
                             metaError = "You can only edit your own events.",
                             categories = categories,
-                            subscribeGate = false
+                            subscribeGate = false,
+                            hostRole = quota.role
                         )
                     }
                     return@launch
@@ -163,6 +167,7 @@ class CreateEventViewModel(
                         categories = categories,
                         hostedCount = quota.hostedEventCount,
                         subscriptionActive = quota.subscriptionActive,
+                        hostRole = quota.role,
                         subscribeGate = false,
                         editingEventId = editId,
                         rsvpCountForEdit = ev.rsvpCount ?: 0,
@@ -192,6 +197,7 @@ class CreateEventViewModel(
                     categories = categories,
                     hostedCount = quota.hostedEventCount,
                     subscriptionActive = quota.subscriptionActive,
+                    hostRole = quota.role,
                     subscribeGate = gate,
                     selectedCategoryId = it.selectedCategoryId ?: categories.firstOrNull()?.id
                 )
@@ -446,6 +452,7 @@ class CreateEventViewModel(
                             isPublishing = false,
                             navigateToEventId = event.id,
                             hostedCount = quotaAfter?.hostedEventCount ?: s.hostedCount,
+                            hostRole = quotaAfter?.role ?: s.hostRole,
                             subscribeGate = quotaAfter?.let { q -> !q.canCreateEvent } ?: s.subscribeGate
                         )
                     },
@@ -503,13 +510,27 @@ class CreateEventViewModel(
     }
 
     private fun humanizePublishError(raw: String?): String {
+        val app = getApplication<Application>()
         val msg = raw.orEmpty()
+        val rls = msg.contains("42501", ignoreCase = true) ||
+            msg.contains("permission denied", ignoreCase = true) ||
+            msg.contains("new row violates row-level security", ignoreCase = true) ||
+            msg.contains("RLS", ignoreCase = true)
+        if (rls) {
+            val st = _uiState.value
+            return when {
+                !st.hostRole.canCreateEvents ->
+                    app.getString(R.string.create_event_error_not_organizer_rls)
+                st.editingEventId == null &&
+                    st.hostRole.canCreateEvents &&
+                    !st.subscriptionActive &&
+                    st.hostedCount >= 2 ->
+                    app.getString(R.string.create_event_error_free_tier_rls)
+                else ->
+                    app.getString(R.string.create_event_error_permission_generic)
+            }
+        }
         return when {
-            msg.contains("42501", ignoreCase = true) ||
-                msg.contains("permission denied", ignoreCase = true) ||
-                msg.contains("new row violates row-level security", ignoreCase = true) ||
-                msg.contains("RLS", ignoreCase = true) ->
-                "You cannot publish more events on the free plan. Subscribe to continue hosting."
             msg.contains("23503", ignoreCase = true) ->
                 "Invalid area or category. Refresh and try again."
             msg.isNotBlank() -> msg

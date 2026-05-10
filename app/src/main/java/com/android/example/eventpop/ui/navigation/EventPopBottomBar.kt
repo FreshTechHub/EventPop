@@ -31,11 +31,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Person
@@ -51,11 +53,13 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.android.example.eventpop.R
 import com.android.example.eventpop.ui.theme.AppBarNavy
 import com.android.example.eventpop.ui.theme.OrangeAccent
 
@@ -75,12 +79,27 @@ fun EventPopBottomBar(
     onNavMap: () -> Unit,
     onNavDiscover: () -> Unit,
     onNavFavorites: () -> Unit,
+    onNavMyEvents: () -> Unit,
     onNavProfile: () -> Unit,
+    isOrganizer: Boolean,
     modifier: Modifier = Modifier
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val items = remember(onNavEvents, onNavMap, onNavDiscover, onNavFavorites, onNavProfile) {
+    val fourthRoute =
+        if (isOrganizer) EventPopDestinations.MY_EVENTS else EventPopDestinations.FAVOURITES
+    val fourthLabel = stringResource(if (isOrganizer) R.string.nav_my_events else R.string.nav_saved)
+    val items = remember(
+        onNavEvents,
+        onNavMap,
+        onNavDiscover,
+        onNavFavorites,
+        onNavMyEvents,
+        onNavProfile,
+        isOrganizer,
+        fourthRoute,
+        fourthLabel
+    ) {
         listOf(
             BottomNavItem(
                 route = EventPopDestinations.EVENTS,
@@ -104,11 +123,11 @@ fun EventPopBottomBar(
                 onClick = onNavDiscover
             ),
             BottomNavItem(
-                route = EventPopDestinations.FAVOURITES,
-                label = "Saved",
-                selectedIcon = Icons.Filled.Bookmark,
-                unselectedIcon = Icons.Outlined.BookmarkBorder,
-                onClick = onNavFavorites,
+                route = fourthRoute,
+                label = fourthLabel,
+                selectedIcon = if (isOrganizer) Icons.Filled.EventAvailable else Icons.Filled.Bookmark,
+                unselectedIcon = if (isOrganizer) Icons.Outlined.EventAvailable else Icons.Outlined.BookmarkBorder,
+                onClick = if (isOrganizer) onNavMyEvents else onNavFavorites,
                 badgeCount = 0
             ),
             BottomNavItem(

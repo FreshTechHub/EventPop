@@ -606,12 +606,14 @@ fun ProfileScreen(
                     label = stringResource(R.string.profile_edit_profile_title),
                     onClick = { showEditSheet = true }
                 )
-                ProfileRowDivider()
-                ProfileRowItem(
-                    icon = Icons.Outlined.AddCircleOutline,
-                    label = stringResource(R.string.profile_create_event),
-                    onClick = onCreateEvent
-                )
+                if (uiState.canCreateEvents) {
+                    ProfileRowDivider()
+                    ProfileRowItem(
+                        icon = Icons.Outlined.AddCircleOutline,
+                        label = stringResource(R.string.profile_create_event),
+                        onClick = onCreateEvent
+                    )
+                }
                 ProfileRowDivider()
                 ProfileRowItem(
                     icon = Icons.Outlined.ChatBubbleOutline,

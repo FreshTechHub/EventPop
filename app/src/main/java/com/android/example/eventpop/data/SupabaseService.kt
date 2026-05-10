@@ -116,8 +116,51 @@ object SupabaseService {
             email = user.email,
             displayName = resolvedName,
             avatarUrl = avatarUrl,
-            isLoggedIn = true
+            isLoggedIn = true,
+            role = cachedRole
         )
+    }
+
+    /**
+     * In-memory cache of the caller's RBAC role. Refreshed by [fetchCurrentUserRoleRemote] /
+     * [fetchHostQuotaRemote]. Defaults to [UserRole.USER] so the app is safe by default
+     * before the first server round-trip.
+     */
+    @Volatile
+    private var cachedRole: UserRole = UserRole.USER
+
+    fun cachedUserRole(): UserRole = cachedRole
+
+    fun clearCachedUserRole() {
+        cachedRole = UserRole.USER
+    }
+
+    /**
+     * Server-of-truth fetch for the caller's role. Hits the [public.get_my_role] RPC.
+     * Falls back to a direct select on [public.profiles] if the RPC is unavailable.
+     */
+    suspend fun fetchCurrentUserRoleRemote(): UserRole = withContext(Dispatchers.IO) {
+        val pg = postgrest ?: return@withContext UserRole.USER
+        val uid = auth?.currentUserOrNull()?.id ?: return@withContext UserRole.USER
+        val resolved = runCatching {
+            val raw = pg.rpc("get_my_role").data
+            val cleaned = raw.trim().removeSurrounding("\"").removeSurrounding("'")
+            UserRole.fromWire(cleaned)
+        }.getOrElse { rpcErr ->
+            Log.w("SupabaseService", "fetchCurrentUserRoleRemote RPC: ${rpcErr.message}")
+            runCatching {
+                pg["profiles"].select(columns = Columns.raw("role")) {
+                    filter { eq("id", uid) }
+                }.decodeList<ProfileRoleRow>().singleOrNull()?.role
+                    ?.let(UserRole::fromWire)
+                    ?: UserRole.USER
+            }.getOrElse { e ->
+                Log.w("SupabaseService", "fetchCurrentUserRoleRemote profile: ${e.message}")
+                UserRole.USER
+            }
+        }
+        cachedRole = resolved
+        resolved
     }
 
     suspend fun signOut() {
@@ -249,9 +292,21 @@ object SupabaseService {
     )
 
     @Serializable
+    private data class ProfileRoleRow(
+        val role: String? = null
+    )
+
+    @Serializable
+    private data class ProfileSubscriptionAndRoleRow(
+        @SerialName("subscription_active") val subscriptionActive: Boolean = false,
+        val role: String? = null
+    )
+
+    @Serializable
     private data class HostQuotaRpcRow(
         @SerialName("subscription_active") val subscriptionActive: Boolean = false,
-        @SerialName("hosted_event_count") val hostedEventCount: Long = 0L
+        @SerialName("hosted_event_count") val hostedEventCount: Long = 0L,
+        val role: String? = null
     )
 
     @Serializable
@@ -309,20 +364,25 @@ object SupabaseService {
                 Log.w("SupabaseService", "fetchHostQuotaRemote RPC: ${e.message}")
             }.getOrNull()
             if (rpcQuota != null) {
+                val role = UserRole.fromWire(rpcQuota.role)
+                cachedRole = role
                 return@withContext HostEventQuota(
                     subscriptionActive = rpcQuota.subscriptionActive,
-                    hostedEventCount = rpcQuota.hostedEventCount.toInt().coerceAtLeast(0)
+                    hostedEventCount = rpcQuota.hostedEventCount.toInt().coerceAtLeast(0),
+                    role = role
                 )
             }
 
-            val subscribed = try {
-                pg["profiles"].select(columns = Columns.raw("subscription_active")) {
+            val (subscribed, role) = try {
+                val row = pg["profiles"].select(columns = Columns.raw("subscription_active,role")) {
                     filter { eq("id", uid) }
-                }.decodeList<ProfileSubscriptionRemote>().singleOrNull()?.subscriptionActive == true
+                }.decodeList<ProfileSubscriptionAndRoleRow>().singleOrNull()
+                (row?.subscriptionActive == true) to UserRole.fromWire(row?.role)
             } catch (e: Exception) {
                 Log.w("SupabaseService", "fetchHostQuotaRemote profile: ${e.message}")
-                false
+                false to UserRole.USER
             }
+            cachedRole = role
             val count = try {
                 pg["events"].select(columns = Columns.raw("id")) {
                     filter { eq("created_by", uid) }
@@ -335,7 +395,11 @@ object SupabaseService {
                 )
                 0
             }
-            HostEventQuota(subscriptionActive = subscribed, hostedEventCount = count)
+            HostEventQuota(
+                subscriptionActive = subscribed,
+                hostedEventCount = count,
+                role = role
+            )
         } catch (e: Exception) {
             Log.e("SupabaseService", "fetchHostQuotaRemote: ${e.message}", e)
             null
@@ -548,6 +612,24 @@ object SupabaseService {
             rows.map { it.toEvent().withResolvedStorageImage(StorageBuckets.EVENT_IMAGES) }
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error fetching events", e)
+            null
+        }
+    }
+
+    /**
+     * Events created by the signed-in user ([public.events.created_by]).
+     * Empty list when not signed in; null only on transport failure.
+     */
+    suspend fun fetchHostedEventsForCurrentUser(): List<Event>? = withContext(Dispatchers.IO) {
+        val uid = auth?.currentUserOrNull()?.id ?: return@withContext emptyList()
+        try {
+            val rows = loadEventRows(eventsSelectColumns) {
+                eq("created_by", uid)
+            }
+            if (postgrest == null) return@withContext null
+            rows.map { it.toEvent().withResolvedStorageImage(StorageBuckets.EVENT_IMAGES) }
+        } catch (e: Exception) {
+            Log.e("SupabaseService", "fetchHostedEventsForCurrentUser: ${e.message}", e)
             null
         }
     }

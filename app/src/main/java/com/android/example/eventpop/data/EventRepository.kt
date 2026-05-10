@@ -81,7 +81,17 @@ class EventRepository(
         return emptyList<NamedLookupRow>() to categories
     }
 
-    suspend fun fetchHostQuota(): HostEventQuota? = SupabaseService.fetchHostQuotaRemote()
+    suspend fun fetchHostQuota(): HostEventQuota? {
+        val q = SupabaseService.fetchHostQuotaRemote()
+        q?.let { AuthRepository.publishRole(it.role) }
+        return q
+    }
+
+    /**
+     * Events where [Event.createdBy] is the current user (from Supabase).
+     */
+    suspend fun fetchHostedEventsForCurrentUser(): List<Event>? =
+        SupabaseService.fetchHostedEventsForCurrentUser()
 
     suspend fun createEvent(submission: CreateEventSubmission): Result<Event> {
         val result = SupabaseService.insertEventRemote(submission)

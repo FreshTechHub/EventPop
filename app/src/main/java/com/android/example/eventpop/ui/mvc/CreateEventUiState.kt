@@ -2,6 +2,7 @@ package com.android.example.eventpop.ui.mvc
 
 import com.android.example.eventpop.data.EventLocationData
 import com.android.example.eventpop.data.NamedLookupRow
+import com.android.example.eventpop.data.UserRole
 
 data class CreateEventFieldErrors(
     val title: String? = null,
@@ -24,6 +25,8 @@ data class CreateEventUiState(
     val subscribeGate: Boolean = false,
     val hostedCount: Int = 0,
     val subscriptionActive: Boolean = false,
+    /** From host quota RPC — drives clearer RLS / publish error messages. */
+    val hostRole: UserRole = UserRole.USER,
     val categories: List<NamedLookupRow> = emptyList(),
     val selectedCategoryId: String? = null,
     /** Free-text neighbourhood / area (stored as a new or existing [public.areas] row on publish). */

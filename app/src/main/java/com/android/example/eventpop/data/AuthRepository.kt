@@ -1,6 +1,9 @@
 package com.android.example.eventpop.data
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
@@ -9,14 +12,39 @@ import kotlin.random.Random
  */
 object AuthRepository {
 
+    private val _roleFlow = MutableStateFlow(SupabaseService.cachedUserRole())
+    val roleFlow: StateFlow<UserRole> = _roleFlow.asStateFlow()
+
+    /** Keeps [roleFlow] aligned when [SupabaseService] resolves role outside [refreshRole]. */
+    fun publishRole(role: UserRole) {
+        _roleFlow.value = role
+    }
+
     fun isLoggedIn(): Boolean = SupabaseService.isUserLoggedIn()
 
     fun currentUserId(): String? = SupabaseService.currentUserId()
 
     fun currentProfile(): UserProfileSnapshot = SupabaseService.currentProfileSnapshot()
 
+    /**
+     * RBAC predicate: only callers cached as organizer/admin may navigate to event-creation
+     * screens. Server-side RLS is the authority — this is a UX-only guard.
+     */
+    fun isOrganizer(): Boolean = _roleFlow.value.canCreateEvents
+
+    fun cachedRole(): UserRole = _roleFlow.value
+
+    /** Refresh role cache from the server; safe to call after sign-in or on resume. */
+    suspend fun refreshRole(): UserRole = withContext(Dispatchers.IO) {
+        val r = SupabaseService.fetchCurrentUserRoleRemote()
+        _roleFlow.value = r
+        r
+    }
+
     suspend fun signOut() {
         SupabaseService.signOut()
+        SupabaseService.clearCachedUserRole()
+        _roleFlow.value = UserRole.USER
     }
 
     suspend fun signIn(email: String, password: String): Result<Unit> = withContext(Dispatchers.IO) {

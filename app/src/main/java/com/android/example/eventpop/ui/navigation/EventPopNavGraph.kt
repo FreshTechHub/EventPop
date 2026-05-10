@@ -39,6 +39,7 @@ import com.android.example.eventpop.LandingPageActivity
 import com.android.example.eventpop.R
 import com.android.example.eventpop.data.AuthRepository
 import com.android.example.eventpop.data.EventFilter
+import com.android.example.eventpop.data.UserRole
 import com.android.example.eventpop.ui.controller.AppViewModelFactory
 import com.android.example.eventpop.ui.controller.CreateEventViewModelFactory
 import com.android.example.eventpop.ui.home.HomeScreen
@@ -48,12 +49,14 @@ import com.android.example.eventpop.ui.screens.FavoritesScreen
 import com.android.example.eventpop.ui.screens.FilterEventsScreen
 import com.android.example.eventpop.ui.screens.MapScreen
 import com.android.example.eventpop.ui.screens.CreateEventScreen
+import com.android.example.eventpop.ui.screens.MyHostedEventsScreen
 import com.android.example.eventpop.ui.screens.ProfileScreen
 import com.android.example.eventpop.ui.screens.SearchScreen
 import com.android.example.eventpop.ui.viewmodel.DiscoverViewModel
 import com.android.example.eventpop.ui.viewmodel.EventDetailViewModel
 import com.android.example.eventpop.ui.viewmodel.FavoritesViewModel
 import com.android.example.eventpop.ui.viewmodel.HomeViewModel
+import com.android.example.eventpop.ui.viewmodel.HostedEventsViewModel
 import com.android.example.eventpop.ui.viewmodel.MapViewModel
 import com.android.example.eventpop.ui.viewmodel.ProfileViewModel
 import com.android.example.eventpop.ui.viewmodel.CreateEventViewModel
@@ -65,6 +68,7 @@ object EventPopDestinations {
     const val MAP = "map"
     const val DISCOVER = "discover"
     const val FAVOURITES = "favourites"
+    const val MY_EVENTS = "my_events"
     const val PROFILE = "profile"
     const val FILTER_EVENTS = "filter_events"
     const val FILTER_RESULT_KEY = "event_filter"
@@ -94,6 +98,15 @@ fun EventPopNavGraph(
     }
     val viewModelFactory = remember(app) { AppViewModelFactory(app) }
     val coroutineScope = rememberCoroutineScope()
+
+    val role by AuthRepository.roleFlow.collectAsState(initial = UserRole.USER)
+    val isOrganizer = role.canCreateEvents
+
+    LaunchedEffect(Unit) {
+        coroutineScope.launch {
+            AuthRepository.refreshRole()
+        }
+    }
 
     var backPressedOnce by remember { mutableStateOf(false) }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -129,14 +142,17 @@ fun EventPopNavGraph(
     val navMap = { navigateToTab(EventPopDestinations.MAP) }
     val navDiscover = { navigateToTab(EventPopDestinations.DISCOVER) }
     val navFavorites = { navigateToTab(EventPopDestinations.FAVOURITES) }
+    val navMyEvents = { navigateToTab(EventPopDestinations.MY_EVENTS) }
+    val navFourthTab = if (isOrganizer) navMyEvents else navFavorites
     val navProfile = { navigateToTab(EventPopDestinations.PROFILE) }
-    val shouldShowBottomBar by remember(currentRoute) {
+    val shouldShowBottomBar by remember(currentRoute, isOrganizer) {
         derivedStateOf {
             currentRoute in setOf(
                 EventPopDestinations.EVENTS,
                 EventPopDestinations.MAP,
                 EventPopDestinations.DISCOVER,
                 EventPopDestinations.FAVOURITES,
+                EventPopDestinations.MY_EVENTS,
                 EventPopDestinations.PROFILE
             )
         }
@@ -165,7 +181,9 @@ fun EventPopNavGraph(
                     onNavMap = navMap,
                     onNavDiscover = navDiscover,
                     onNavFavorites = navFavorites,
-                    onNavProfile = navProfile
+                    onNavMyEvents = navMyEvents,
+                    onNavProfile = navProfile,
+                    isOrganizer = isOrganizer
                 )
             }
         }
@@ -189,7 +207,7 @@ fun EventPopNavGraph(
                 onNavEvents = navEvents,
                 onNavMap = navMap,
                 onNavDiscover = navDiscover,
-                onNavFavorites = navFavorites,
+                onNavFavorites = navFourthTab,
                 onNavProfile = navProfile,
                 onSearchClick = { navController.navigate(EventPopDestinations.SEARCH) },
                 onSeeAllHotEvents = navDiscover,
@@ -215,7 +233,7 @@ fun EventPopNavGraph(
                 onNavEvents = navEvents,
                 onNavMap = navMap,
                 onNavDiscover = navDiscover,
-                onNavFavorites = navFavorites,
+                onNavFavorites = navFourthTab,
                 onNavProfile = navProfile,
                 onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) },
                 uiState = discoverUiState,
@@ -240,7 +258,7 @@ fun EventPopNavGraph(
                 onNavEvents = navEvents,
                 onNavMap = navMap,
                 onNavDiscover = navDiscover,
-                onNavFavorites = navFavorites,
+                onNavFavorites = navFourthTab,
                 onNavProfile = navProfile,
                 onSignIn = {
                     context.startActivity(
@@ -252,6 +270,55 @@ fun EventPopNavGraph(
                     )
                 },
                 onRemoveFavorite = { favoritesViewModel.removeFromFavorites(it.id) }
+            )
+        }
+
+        composable(EventPopDestinations.MY_EVENTS) {
+            val hostedVm: HostedEventsViewModel = viewModel(factory = viewModelFactory)
+            LaunchedEffect(Unit) {
+                hostedVm.refresh()
+            }
+            val hostedUi by hostedVm.uiState.collectAsState()
+            MyHostedEventsScreen(
+                uiState = hostedUi,
+                modifier = Modifier.padding(innerPadding),
+                onEventClick = { navController.navigate(EventPopDestinations.eventDetailRoute(it.id)) },
+                onEditEvent = { navController.navigate(EventPopDestinations.createEventRoute(it.id)) },
+                onCreateFirstEvent = {
+                    when {
+                        !AuthRepository.isLoggedIn() -> Toast.makeText(
+                            context,
+                            context.getString(R.string.create_event_sign_in_required),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        !AuthRepository.isOrganizer() -> Toast.makeText(
+                            context,
+                            context.getString(R.string.create_event_organizer_required),
+                            Toast.LENGTH_LONG
+                        ).show()
+                        else -> navController.navigate(EventPopDestinations.createEventRoute())
+                    }
+                },
+                onDeleteRequested = { ev ->
+                    hostedVm.deleteHostedEvent(ev.id) { ok ->
+                        if (!ok) {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.hosted_events_delete_failed),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                },
+                onSignIn = {
+                    context.startActivity(
+                        Intent(context, LandingPageActivity::class.java).apply {
+                            addFlags(
+                                Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            )
+                        }
+                    )
+                }
             )
         }
 
@@ -278,14 +345,18 @@ fun EventPopNavGraph(
                 rsvpCount = rsvpCount,
                 modifier = Modifier.padding(innerPadding),
                 onCreateEvent = {
-                    if (AuthRepository.isLoggedIn()) {
-                        navController.navigate(EventPopDestinations.createEventRoute())
-                    } else {
-                        Toast.makeText(
+                    when {
+                        !AuthRepository.isLoggedIn() -> Toast.makeText(
                             context,
                             context.getString(R.string.create_event_sign_in_required),
                             Toast.LENGTH_SHORT
                         ).show()
+                        !AuthRepository.isOrganizer() -> Toast.makeText(
+                            context,
+                            context.getString(R.string.create_event_organizer_required),
+                            Toast.LENGTH_LONG
+                        ).show()
+                        else -> navController.navigate(EventPopDestinations.createEventRoute())
                     }
                 },
                 onLogoutConfirmed = {
@@ -375,6 +446,30 @@ fun EventPopNavGraph(
             val app = LocalContext.current.applicationContext as EventPopApp
             val createFactory = remember(editId) { CreateEventViewModelFactory(app, editId) }
             val createViewModel: CreateEventViewModel = viewModel(factory = createFactory)
+
+            // RBAC guard: only organizers/admins may reach this screen. Defends against
+            // deep links and stale back-stacks. Server RLS is the actual authority.
+            LaunchedEffect(editId) {
+                if (!AuthRepository.isLoggedIn()) {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.create_event_sign_in_required),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    navController.popBackStack()
+                    return@LaunchedEffect
+                }
+                AuthRepository.refreshRole()
+                if (!AuthRepository.isOrganizer()) {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.create_event_organizer_required),
+                        Toast.LENGTH_LONG
+                    ).show()
+                    navController.popBackStack()
+                }
+            }
+
             CreateEventScreen(
                 navController = navController,
                 viewModel = createViewModel

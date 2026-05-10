@@ -60,7 +60,8 @@ class ProfileViewModel(
                             "Guest"
                         },
                         avatarUrl = if (loggedIn) firstNonBlank(local.avatarUrl, snap.avatarUrl) else "",
-                        avatarLocalPath = if (loggedIn) local.avatarLocalPath else ""
+                        avatarLocalPath = if (loggedIn) local.avatarLocalPath else "",
+                        role = if (loggedIn) local.role else com.android.example.eventpop.data.UserRole.USER
                     )
                 }
             }

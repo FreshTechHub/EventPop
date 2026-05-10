@@ -77,6 +77,11 @@ CREATE TABLE public.profiles (
   updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   subscription_active boolean NOT NULL DEFAULT false,
   subscription_expires_at timestamp with time zone,
+  role public.user_role NOT NULL DEFAULT 'user',
   CONSTRAINT profiles_pkey PRIMARY KEY (id),
   CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
 );
+
+-- Enum for RBAC. New signups default to 'user'; organizers/admins are seeded
+-- via supabase/scripts/seed_organizers.sql.
+-- CREATE TYPE public.user_role AS ENUM ('user', 'organizer', 'admin');

@@ -80,6 +80,7 @@ class LoginViewModel : ViewModel() {
                 AuthRepository.signIn(email, password)
             }
             _uiState.value = if (result.isSuccess) {
+                withContext(Dispatchers.IO) { AuthRepository.refreshRole() }
                 LoginUiState.Success
             } else {
                 val msg = result.exceptionOrNull()?.message.orEmpty()

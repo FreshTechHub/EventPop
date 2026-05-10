@@ -63,6 +63,8 @@ class ProfileRepository(
             return@withContext Result.success(Unit)
         }
         runCatching {
+            val role = SupabaseService.fetchCurrentUserRoleRemote()
+            AuthRepository.publishRole(role)
             val snap = SupabaseService.currentProfileSnapshot()
             val current = localDataStore.getProfile().first()
             val merged = current.copy(
@@ -71,7 +73,8 @@ class ProfileRepository(
                 avatarUrl = snap.avatarUrl.ifBlank { current.avatarUrl },
                 avatarLocalPath = current.avatarLocalPath,
                 lastSyncedEpochMillis = System.currentTimeMillis(),
-                pendingSync = current.pendingSync
+                pendingSync = current.pendingSync,
+                role = role
             )
             localDataStore.saveProfile(merged)
         }.fold(
