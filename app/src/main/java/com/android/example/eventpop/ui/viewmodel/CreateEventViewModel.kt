@@ -512,22 +512,21 @@ class CreateEventViewModel(
     private fun humanizePublishError(raw: String?): String {
         val app = getApplication<Application>()
         val msg = raw.orEmpty()
+
+        if (msg.isTransportFailure()) {
+            return app.getString(R.string.create_event_error_network)
+        }
+
         val rls = msg.contains("42501", ignoreCase = true) ||
             msg.contains("permission denied", ignoreCase = true) ||
             msg.contains("new row violates row-level security", ignoreCase = true) ||
             msg.contains("RLS", ignoreCase = true)
         if (rls) {
             val st = _uiState.value
-            return when {
-                !st.hostRole.canCreateEvents ->
-                    app.getString(R.string.create_event_error_not_organizer_rls)
-                st.editingEventId == null &&
-                    st.hostRole.canCreateEvents &&
-                    !st.subscriptionActive &&
-                    st.hostedCount >= 2 ->
-                    app.getString(R.string.create_event_error_free_tier_rls)
-                else ->
-                    app.getString(R.string.create_event_error_permission_generic)
+            return if (!st.hostRole.canCreateEvents) {
+                app.getString(R.string.create_event_error_not_organizer_rls)
+            } else {
+                app.getString(R.string.create_event_error_permission_generic)
             }
         }
         return when {
@@ -536,5 +535,27 @@ class CreateEventViewModel(
             msg.isNotBlank() -> msg
             else -> "Could not publish. Try again."
         }
+    }
+
+    private fun String.isTransportFailure(): Boolean {
+        if (isBlank()) return false
+        val needles = listOf(
+            "UnknownHostException",
+            "ConnectException",
+            "SocketTimeoutException",
+            "SSLHandshakeException",
+            "HttpRequestTimeoutException",
+            "ConnectTimeoutException",
+            "Failed to connect",
+            "Unable to resolve host",
+            "Network is unreachable",
+            "Software caused connection abort",
+            "Connection refused",
+            "Connection reset",
+            "Connection closed",
+            "timeout",
+            "I/O error"
+        )
+        return needles.any { contains(it, ignoreCase = true) }
     }
 }

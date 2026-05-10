@@ -121,8 +121,8 @@
     <string name="create_event_sign_in_required">Sign in to create events.</string>
     <string name="create_event_organizer_required">Only event organizers can create events. Contact us to request organizer access.</string>
     <string name="create_event_error_not_organizer_rls">Your account can\'t publish events yet. Ask us for organizer access.</string>
-    <string name="create_event_error_free_tier_rls">You\'ve reached the free hosting limit. Subscribe to publish more events.</string>
     <string name="create_event_error_permission_generic">Couldn\'t save your event. Check your connection and try again.</string>
+    <string name="create_event_error_network">Network problem. Check your connection and try again.</string>
 
     <!-- Create event -->
     <string name="create_event_title">Create event</string>

@@ -11,9 +11,9 @@ data class NamedLookupRow(
 /**
  * Hosting quota from [public.profiles] + count of [public.events] for [auth.uid].
  *
- * [role] gates **whether** the caller is allowed to create events at all
- * (RBAC), while [subscriptionActive] / [hostedEventCount] control **how many**
- * events an organizer may create. Both must be satisfied for [canCreateEvent].
+ * Mirrors `public.user_can_create_event()`: the only requirement to publish is
+ * having an organizer/admin [role]. [subscriptionActive] and [hostedEventCount]
+ * are kept for UI display (counters / future paywall) but no longer block.
  */
 data class HostEventQuota(
     val subscriptionActive: Boolean,
@@ -21,8 +21,7 @@ data class HostEventQuota(
     val role: UserRole = UserRole.USER
 ) {
     val canCreateEvent: Boolean
-        get() = role.canCreateEvents &&
-            (subscriptionActive || hostedEventCount < 2)
+        get() = role.canCreateEvents
 }
 
 /**

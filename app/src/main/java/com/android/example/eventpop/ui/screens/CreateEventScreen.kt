@@ -980,30 +980,39 @@ private fun PickerOutlineField(
     onClick: () -> Unit
 ) {
     Column {
-        OutlinedTextField(
-            value = value,
-            onValueChange = {},
-            readOnly = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick),
-            label = { Text(label) },
-            trailingIcon = {
-                Icon(
-                    imageVector = Icons.Filled.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = SubtitleGray
-                )
-            },
-            isError = error != null,
-            supportingText = {
-                if (error != null) {
-                    Text(error, color = MaterialTheme.colorScheme.error)
-                }
-            },
-            shape = FieldShape,
-            colors = createEventFieldColors()
-        )
+        // OutlinedTextField with `readOnly = true` swallows tap events for focus
+        // management, so the bare `.clickable` modifier is unreliable. We render
+        // the field, then put a transparent click-catcher box on top with
+        // matchParentSize so taps anywhere on the field reliably open the picker.
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = value,
+                onValueChange = {},
+                readOnly = true,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(label) },
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Filled.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = SubtitleGray
+                    )
+                },
+                isError = error != null,
+                supportingText = {
+                    if (error != null) {
+                        Text(error, color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                shape = FieldShape,
+                colors = createEventFieldColors()
+            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clickable(onClick = onClick)
+            )
+        }
     }
 }
 
