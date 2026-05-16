@@ -231,8 +231,8 @@
 
     <string name="landing_sign_in">Sign In</string>
     <string name="landing_eyebrow">HAPPENING IN KAMPALA</string>
-    <string name="landing_hero_title">Find Events\nYou Will Love</string>
-    <string name="landing_hero_subtitle">Discover live music, food, art, and more happening right now near you.</string>
+    <string name="landing_hero_title">Find Events\nThat Feel Made For You</string>
+    <string name="landing_hero_subtitle">Explore live music, food, art, and more—all happening near you right now.</string>
     <string name="landing_stat_events_listed">Events Listed</string>
     <string name="landing_stat_this_weekend">This Weekend</string>
     <string name="landing_stat_free_value">Free</string>
