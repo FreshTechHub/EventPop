@@ -24,12 +24,12 @@ local.properties
 *.hprof
 .env
 
-# Ignore all build folders
+# Ignore root build folder only
 /build
 
 # Allow APK output path
-!app/build/
-!app/build/outputs/
-!app/build/outputs/apk/
-!app/build/outputs/apk/debug/
-!app/build/outputs/apk/debug/app-debug.apk
+!/app/build/
+!/app/build/outputs/
+!/app/build/outputs/apk/
+!/app/build/outputs/apk/debug/
+!/app/build/outputs/apk/debug/app-debug.apk
