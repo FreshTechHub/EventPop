@@ -1,6 +1,7 @@
 *.iml
 .gradle
 /local.properties
+
 /.idea/caches
 /.idea/libraries
 /.idea/modules.xml
@@ -12,13 +13,23 @@
 /.idea/deviceManager.xml
 /.idea/shelf/
 /.idea/codeStyles/
+
 .DS_Store
-/build
 /captures
 .externalNativeBuild
 .cxx
-local.properties
-.env
 .kotlin/
+
+local.properties
 *.hprof
+.env
+
+# Ignore all build folders
+/build
+
+# Allow APK output path
+!app/build/
+!app/build/outputs/
+!app/build/outputs/apk/
+!app/build/outputs/apk/debug/
 !app/build/outputs/apk/debug/app-debug.apk
